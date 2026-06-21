@@ -58,6 +58,19 @@ body.home-page-active .app-content {
   overflow: hidden;
 }
 
+/* В истории прокручивается только список смен, а верхняя часть остаётся на месте. */
+body.history-page-active {
+  height: 100dvh;
+  overflow: hidden;
+}
+
+body.history-page-active .app-shell,
+body.history-page-active .app-content {
+  height: 100dvh;
+  min-height: 100dvh;
+  overflow: hidden;
+}
+
 .app-shell {
   width: min(100%, 520px);
   min-height: 100vh;
@@ -80,6 +93,13 @@ body.home-page-active .app-content {
   min-height: calc(100dvh - 150px - env(safe-area-inset-top));
   flex-direction: column;
   justify-content: center;
+}
+
+#calendarPage:not([hidden]) {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
 }
 
 .home-clock-icon {
@@ -284,6 +304,20 @@ h1 {
 .shift-list {
   display: grid;
   gap: 12px;
+}
+
+.history-scroll-area {
+  min-height: 0;
+  padding: 2px 2px 8px;
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.history-scroll-area::-webkit-scrollbar {
+  display: none;
 }
 
 .shift-card {
