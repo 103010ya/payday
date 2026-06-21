@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#eceef1" />
+    <meta
+      name="description"
+      content="Мобильное приложение для учёта рабочих смен"
+    />
+    <title>Учёт смен</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+
+  <body>
+    <div class="app-shell">
+      <main class="app-content">
+        <!-- Главный экран с формой добавления смены -->
+        <section id="homePage" class="page" aria-label="Добавление смены">
+          <div class="home-clock-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 7v5l3.5 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+            </svg>
+          </div>
+
+          <form id="shiftForm" class="shift-form">
+            <div class="field">
+              <!-- Скрытое поле хранит дату в формате, который использует JavaScript -->
+              <input id="shiftDate" name="shiftDate" type="hidden" required />
+
+              <button
+                id="datePickerButton"
+                class="date-picker-button"
+                type="button"
+                aria-label="Выбрать дату смены"
+                aria-haspopup="dialog"
+                aria-expanded="false"
+              >
+                <span id="selectedDateText">Выберите дату</span>
+                <span class="date-picker-button__icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M6.5 2v3M17.5 2v3M3.5 8.5h17M5 4h14a1.5 1.5 0 0 1 1.5 1.5v14A1.5 1.5 0 0 1 19 21H5a1.5 1.5 0 0 1-1.5-1.5v-14A1.5 1.5 0 0 1 5 4Z" />
+                  </svg>
+                </span>
+              </button>
+            </div>
+
+            <div class="time-fields">
+              <div class="field">
+                <!-- Скрытое поле хранит выбранное время начала -->
+                <input
+                  id="startTime"
+                  name="startTime"
+                  type="hidden"
+                  required
+                />
+                <button
+                  id="startTimeButton"
+                  class="time-picker-button"
+                  type="button"
+                  aria-label="Выбрать время начала смены"
+                  aria-haspopup="dialog"
+                  aria-expanded="false"
+                >
+                  <span id="startTimeText">--:--</span>
+                  <span class="time-picker-button__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                      <path d="M12 7v5l3.5 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                    </svg>
+                  </span>
+                </button>
+              </div>
+
+              <div class="field">
+                <!-- Скрытое поле хранит выбранное время окончания -->
+                <input
+                  id="endTime"
+                  name="endTime"
+                  type="hidden"
+                  required
+                />
+                <button
+                  id="endTimeButton"
+                  class="time-picker-button"
+                  type="button"
+                  aria-label="Выбрать время окончания смены"
+                  aria-haspopup="dialog"
+                  aria-expanded="false"
+                >
+                  <span id="endTimeText">--:--</span>
+                  <span class="time-picker-button__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                      <path d="M12 7v5l3.5 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                    </svg>
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            <button id="saveButton" class="save-button" type="submit">
+              Сохранить
+            </button>
+            <button id="cancelEditButton" class="cancel-edit-button" type="button" hidden>
+              Отменить изменение
+            </button>
+          </form>
+
+          <!-- Сообщение появляется после успешного сохранения -->
+          <p id="saveMessage" class="save-message" role="status" aria-live="polite">
+            Смена сохранена
+          </p>
+        </section>
+
+        <!-- Экран со сменами за выбранный месяц -->
+        <section
+          id="calendarPage"
+          class="page"
+          aria-labelledby="historyTitle"
+          hidden
+        >
+          <div class="calendar-heading">
+            <div>
+              <h1 id="historyTitle">История</h1>
+            </div>
+            <span id="shiftCount" class="shift-count">0</span>
+          </div>
+
+          <div class="month-picker-card">
+            <div class="field">
+              <!-- Скрытое поле хранит выбранный месяц для JavaScript -->
+              <input id="monthSelect" name="monthSelect" type="hidden" />
+
+              <button
+                id="monthPickerButton"
+                class="month-picker-button"
+                type="button"
+                aria-label="Выбрать месяц"
+                aria-haspopup="dialog"
+                aria-expanded="false"
+              >
+                <span id="selectedMonthText"></span>
+                <span class="month-picker-button__icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <path d="m7 9 5 5 5-5" />
+                  </svg>
+                </span>
+              </button>
+            </div>
+          </div>
+
+          <!-- JavaScript добавит сюда карточки сохранённых смен -->
+          <div id="shiftList" class="shift-list"></div>
+
+          <div id="emptyState" class="empty-state" hidden>
+            <div class="empty-state__icon" aria-hidden="true">—</div>
+            <p>Нет сохранённых смен за этот месяц</p>
+          </div>
+        </section>
+      </main>
+
+      <!-- Нижняя навигация всегда остаётся доступной -->
+      <nav class="bottom-navigation" aria-label="Основная навигация">
+        <button
+          class="nav-button nav-button--active"
+          type="button"
+          data-page="homePage"
+          aria-current="page"
+        >
+          <span class="nav-button__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M3 10.8 12 3l9 7.8v9.7a.5.5 0 0 1-.5.5h-5.7v-6.2H9.2V21H3.5a.5.5 0 0 1-.5-.5v-9.7Z" />
+            </svg>
+          </span>
+          <span>Главная</span>
+        </button>
+
+        <button class="nav-button" type="button" data-page="calendarPage">
+          <span class="nav-button__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M6.5 2v3M17.5 2v3M3.5 8.5h17M5 4h14a1.5 1.5 0 0 1 1.5 1.5v14A1.5 1.5 0 0 1 19 21H5a1.5 1.5 0 0 1-1.5-1.5v-14A1.5 1.5 0 0 1 5 4Z" />
+            </svg>
+          </span>
+          <span>История</span>
+        </button>
+      </nav>
+    </div>
+
+    <!-- Собственный календарь вместо стандартного календаря браузера -->
+    <div id="datePickerOverlay" class="date-picker-overlay" hidden>
+      <div
+        class="date-picker"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="datePickerTitle"
+      >
+        <div class="date-picker__header">
+          <button
+            id="previousMonthButton"
+            class="month-arrow"
+            type="button"
+            aria-label="Предыдущий месяц"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m15 18-6-6 6-6" />
+            </svg>
+          </button>
+
+          <h2 id="datePickerTitle" class="date-picker__title"></h2>
+
+          <button
+            id="nextMonthButton"
+            class="month-arrow"
+            type="button"
+            aria-label="Следующий месяц"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m9 18 6-6-6-6" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="weekdays" aria-hidden="true">
+          <span>Пн</span>
+          <span>Вт</span>
+          <span>Ср</span>
+          <span>Чт</span>
+          <span>Пт</span>
+          <span>Сб</span>
+          <span>Вс</span>
+        </div>
+
+        <div id="calendarDays" class="calendar-days"></div>
+
+        <button id="todayButton" class="today-button" type="button">
+          Выбрать сегодня
+        </button>
+      </div>
+    </div>
+
+    <!-- Прокручиваемый список сохранённых месяцев -->
+    <div id="monthPickerOverlay" class="month-picker-overlay" hidden>
+      <div
+        class="month-picker-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="monthPickerTitle"
+      >
+        <div class="month-picker-dialog__header">
+          <h2 id="monthPickerTitle">Выберите месяц</h2>
+          <button
+            id="closeMonthPickerButton"
+            class="close-dialog-button"
+            type="button"
+            aria-label="Закрыть выбор месяца"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m6 6 12 12M18 6 6 18" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="month-wheel-wrap">
+          <div
+            id="monthOptions"
+            class="month-wheel"
+            aria-label="Сохранённые месяцы"
+          ></div>
+          <div class="month-wheel__selection" aria-hidden="true"></div>
+        </div>
+
+        <button
+          id="confirmMonthButton"
+          class="confirm-month-button"
+          type="button"
+        >
+          Готово
+        </button>
+      </div>
+    </div>
+
+    <!-- Действия с выбранной сменой: изменение или удаление -->
+    <div id="shiftActionsOverlay" class="shift-actions-overlay" hidden>
+      <div
+        class="shift-actions-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="shiftActionsTitle"
+      >
+        <div class="shift-actions-dialog__header">
+          <div>
+            <p class="shift-actions-dialog__caption">Сохранённая смена</p>
+            <h2 id="shiftActionsTitle"></h2>
+          </div>
+          <button
+            id="closeShiftActionsButton"
+            class="close-dialog-button"
+            type="button"
+            aria-label="Закрыть"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m6 6 12 12M18 6 6 18" />
+            </svg>
+          </button>
+        </div>
+
+        <p id="shiftActionsTime" class="shift-actions-dialog__time"></p>
+
+        <div class="shift-actions-dialog__buttons">
+          <button id="editShiftButton" class="edit-shift-button" type="button">
+            Изменить
+          </button>
+          <button id="deleteShiftButton" class="delete-shift-button" type="button">
+            Удалить
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Выбор времени прокруткой, как в мобильном будильнике -->
+    <div id="timePickerOverlay" class="time-picker-overlay" hidden>
+      <div
+        class="time-picker-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="timePickerTitle"
+      >
+        <div class="time-picker-dialog__header">
+          <h2 id="timePickerTitle">Начало смены</h2>
+          <button
+            id="closeTimePickerButton"
+            class="close-dialog-button"
+            type="button"
+            aria-label="Закрыть выбор времени"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m6 6 12 12M18 6 6 18" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="time-wheels">
+          <div class="time-wheel-column">
+            <span class="time-wheel-column__label">Часы</span>
+            <div id="hourWheel" class="time-wheel" aria-label="Часы"></div>
+          </div>
+
+          <span class="time-wheels__separator" aria-hidden="true">:</span>
+
+          <div class="time-wheel-column">
+            <span class="time-wheel-column__label">Минуты</span>
+            <div id="minuteWheel" class="time-wheel" aria-label="Минуты"></div>
+          </div>
+
+          <!-- Рамка показывает значение, которое будет выбрано -->
+          <div class="time-wheels__selection" aria-hidden="true"></div>
+        </div>
+
+        <button id="confirmTimeButton" class="confirm-time-button" type="button">
+          Готово
+        </button>
+      </div>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
