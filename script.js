@@ -562,6 +562,8 @@ function showSavedMessage(message = "Смена сохранена") {
 
 // Переключает видимый раздел и выделяет активную кнопку внизу.
 function showPage(pageId) {
+  document.body.classList.toggle("home-page-active", pageId === "homePage");
+
   pages.forEach((page) => {
     const isActive = page.id === pageId;
     page.hidden = !isActive;
