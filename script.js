@@ -25,20 +25,24 @@ const timePickerTitle = document.querySelector("#timePickerTitle");
 const closeTimePickerButton = document.querySelector(
   "#closeTimePickerButton",
 );
-const hourWheel = document.querySelector("#hourWheel");
-const minuteWheel = document.querySelector("#minuteWheel");
+const hourValue = document.querySelector("#hourValue");
+const minuteValue = document.querySelector("#minuteValue");
+const increaseHourButton = document.querySelector("#increaseHourButton");
+const decreaseHourButton = document.querySelector("#decreaseHourButton");
+const increaseMinuteButton = document.querySelector("#increaseMinuteButton");
+const decreaseMinuteButton = document.querySelector("#decreaseMinuteButton");
 const confirmTimeButton = document.querySelector("#confirmTimeButton");
 const saveButton = document.querySelector("#saveButton");
 const cancelEditButton = document.querySelector("#cancelEditButton");
 const saveMessage = document.querySelector("#saveMessage");
+const saveMessageText = document.querySelector("#saveMessageText");
 const monthSelect = document.querySelector("#monthSelect");
-const monthPickerButton = document.querySelector("#monthPickerButton");
 const selectedMonthText = document.querySelector("#selectedMonthText");
-const monthPickerOverlay = document.querySelector("#monthPickerOverlay");
-const monthOptions = document.querySelector("#monthOptions");
-const confirmMonthButton = document.querySelector("#confirmMonthButton");
-const closeMonthPickerButton = document.querySelector(
-  "#closeMonthPickerButton",
+const previousHistoryMonthButton = document.querySelector(
+  "#previousHistoryMonthButton",
+);
+const nextHistoryMonthButton = document.querySelector(
+  "#nextHistoryMonthButton",
 );
 const shiftActionsOverlay = document.querySelector("#shiftActionsOverlay");
 const shiftActionsTitle = document.querySelector("#shiftActionsTitle");
@@ -61,9 +65,6 @@ let editingShiftId = null;
 let activeTimeField = null;
 let selectedHour = 0;
 let selectedMinute = 0;
-let hourScrollTimer;
-let minuteScrollTimer;
-let monthScrollTimer;
 let availableMonthKeys = [];
 let selectedMonthIndex = 0;
 
@@ -206,66 +207,21 @@ function setTimeValue(fieldName, timeValue) {
   text.textContent = timeValue || "--:--";
 }
 
-// Создаёт значения для прокрутки: часы 00–23 и минуты 00–59.
-function createTimeWheelOptions() {
-  for (let hour = 0; hour < 24; hour += 1) {
-    const option = document.createElement("div");
-    option.className = "time-wheel__option";
-    option.textContent = String(hour).padStart(2, "0");
-    option.dataset.value = hour;
-    hourWheel.append(option);
-  }
-
-  for (let minute = 0; minute < 60; minute += 1) {
-    const option = document.createElement("div");
-    option.className = "time-wheel__option";
-    option.textContent = String(minute).padStart(2, "0");
-    option.dataset.value = minute;
-    minuteWheel.append(option);
-  }
+// Обновляет крупные значения часов и минут во всплывающем окне.
+function renderTimeStepper() {
+  hourValue.textContent = String(selectedHour).padStart(2, "0");
+  minuteValue.textContent = String(selectedMinute).padStart(2, "0");
 }
 
-// Выделяет значение, которое сейчас находится в центре прокрутки.
-function updateWheelSelection(wheel, value) {
-  wheel.querySelectorAll(".time-wheel__option").forEach((option) => {
-    option.classList.toggle(
-      "time-wheel__option--selected",
-      Number(option.dataset.value) === value,
-    );
-  });
-}
-
-function getWheelValue(wheel, maximumValue) {
-  const optionHeight = 54;
-  return Math.min(maximumValue, Math.max(0, Math.round(wheel.scrollTop / optionHeight)));
-}
-
-function handleWheelScroll(wheel, type) {
-  const isHourWheel = type === "hour";
-  const timer = isHourWheel ? hourScrollTimer : minuteScrollTimer;
-
-  window.clearTimeout(timer);
-
-  const newTimer = window.setTimeout(() => {
-    const value = getWheelValue(wheel, isHourWheel ? 23 : 59);
-
-    if (isHourWheel) {
-      selectedHour = value;
-      hourScrollTimer = null;
-    } else {
-      selectedMinute = value;
-      minuteScrollTimer = null;
-    }
-
-    updateWheelSelection(wheel, value);
-    wheel.scrollTo({ top: value * 54, behavior: "smooth" });
-  }, 80);
-
-  if (isHourWheel) {
-    hourScrollTimer = newTimer;
+// Изменяет значение циклически: после максимума снова начинается с нуля.
+function changeTimePart(type, direction) {
+  if (type === "hour") {
+    selectedHour = (selectedHour + direction + 24) % 24;
   } else {
-    minuteScrollTimer = newTimer;
+    selectedMinute = (selectedMinute + direction + 60) % 60;
   }
+
+  renderTimeStepper();
 }
 
 // Открывает выбор времени для начала или окончания смены.
@@ -287,12 +243,7 @@ function openTimePicker(fieldName) {
     fieldName === "start" ? startTimeButton : endTimeButton;
   activeButton.setAttribute("aria-expanded", "true");
 
-  requestAnimationFrame(() => {
-    hourWheel.scrollTop = selectedHour * 54;
-    minuteWheel.scrollTop = selectedMinute * 54;
-    updateWheelSelection(hourWheel, selectedHour);
-    updateWheelSelection(minuteWheel, selectedMinute);
-  });
+  renderTimeStepper();
 
   closeTimePickerButton.focus();
 }
@@ -370,24 +321,20 @@ function getAvailableMonths(shifts) {
   );
 }
 
-// Обновляет выбранный месяц и создаёт значения для прокручиваемого колеса.
+// Обновляет месяц истории и состояние стрелок.
 function renderMonthOptions(preferredMonth) {
   const shifts = getSavedShifts();
   const availableMonths = getAvailableMonths(shifts);
   const currentSelection = preferredMonth || monthSelect.value || getMonthKey(getTodayValue());
   availableMonthKeys = availableMonths;
 
-  // Если смен ещё нет, показываем текущий месяц, но не добавляем пустые месяцы в список.
+  // Если смен ещё нет, показываем текущий месяц и отключаем стрелки.
   if (availableMonths.length === 0) {
     monthSelect.value = getMonthKey(getTodayValue());
     selectedMonthText.textContent = formatMonthName(monthSelect.value);
-    monthOptions.replaceChildren();
-
-    const emptyMessage = document.createElement("p");
-    emptyMessage.className = "month-options__empty";
-    emptyMessage.textContent = "Нет сохранённых месяцев";
-    monthOptions.append(emptyMessage);
-    confirmMonthButton.hidden = true;
+    selectedMonthIndex = -1;
+    previousHistoryMonthButton.disabled = true;
+    nextHistoryMonthButton.disabled = true;
     return;
   }
 
@@ -395,66 +342,32 @@ function renderMonthOptions(preferredMonth) {
     ? currentSelection
     : availableMonths[0];
   selectedMonthText.textContent = formatMonthName(monthSelect.value);
-  monthOptions.replaceChildren();
-  confirmMonthButton.hidden = false;
   selectedMonthIndex = availableMonths.indexOf(monthSelect.value);
-
-  availableMonths.forEach((monthKey, index) => {
-    const option = document.createElement("div");
-    option.className = "month-option";
-    option.textContent = formatMonthName(monthKey);
-    option.dataset.index = index;
-    monthOptions.append(option);
-  });
-
-  updateMonthWheelSelection();
+  // Месяцы отсортированы от нового к старому.
+  previousHistoryMonthButton.disabled =
+    selectedMonthIndex >= availableMonths.length - 1;
+  nextHistoryMonthButton.disabled = selectedMonthIndex <= 0;
 }
 
-function updateMonthWheelSelection() {
-  monthOptions.querySelectorAll(".month-option").forEach((option) => {
-    option.classList.toggle(
-      "month-option--selected",
-      Number(option.dataset.index) === selectedMonthIndex,
-    );
-  });
-}
+function changeHistoryMonth(direction) {
+  if (availableMonthKeys.length === 0) {
+    return;
+  }
 
-function handleMonthWheelScroll() {
-  window.clearTimeout(monthScrollTimer);
+  const newIndex = selectedMonthIndex + direction;
 
-  monthScrollTimer = window.setTimeout(() => {
-    selectedMonthIndex = Math.min(
-      availableMonthKeys.length - 1,
-      Math.max(0, Math.round(monthOptions.scrollTop / 54)),
-    );
+  if (newIndex < 0 || newIndex >= availableMonthKeys.length) {
+    return;
+  }
 
-    updateMonthWheelSelection();
-    monthOptions.scrollTo({
-      top: selectedMonthIndex * 54,
-      behavior: "smooth",
-    });
-  }, 80);
-}
-
-function openMonthPicker() {
-  renderMonthOptions();
-  monthPickerOverlay.hidden = false;
-  monthPickerButton.setAttribute("aria-expanded", "true");
-  document.body.classList.add("dialog-open");
-
-  requestAnimationFrame(() => {
-    monthOptions.scrollTop = selectedMonthIndex * 54;
-    updateMonthWheelSelection();
-  });
-
-  closeMonthPickerButton.focus();
-}
-
-function closeMonthPicker() {
-  monthPickerOverlay.hidden = true;
-  monthPickerButton.setAttribute("aria-expanded", "false");
-  document.body.classList.remove("dialog-open");
-  monthPickerButton.focus();
+  selectedMonthIndex = newIndex;
+  const selectedMonth = availableMonthKeys[selectedMonthIndex];
+  monthSelect.value = selectedMonth;
+  selectedMonthText.textContent = formatMonthName(selectedMonth);
+  previousHistoryMonthButton.disabled =
+    selectedMonthIndex >= availableMonthKeys.length - 1;
+  nextHistoryMonthButton.disabled = selectedMonthIndex <= 0;
+  renderShifts();
 }
 
 // Открывает меню действий для смены, на которую нажал пользователь.
@@ -549,14 +462,17 @@ function renderShifts() {
   shiftCount.textContent = shiftsForMonth.length;
 }
 
-// Коротко показывает подтверждение и затем плавно его скрывает.
-function showSavedMessage(message = "Смена сохранена") {
+// Коротко показывает галочку после сохранения или текст ошибки.
+function showSavedMessage(message = "") {
   window.clearTimeout(messageTimer);
-  saveMessage.textContent = message;
+  saveMessageText.textContent = message;
+  saveMessage.classList.toggle("save-message--text", Boolean(message));
   saveMessage.classList.add("save-message--visible");
 
   messageTimer = window.setTimeout(() => {
     saveMessage.classList.remove("save-message--visible");
+    saveMessage.classList.remove("save-message--text");
+    saveMessageText.textContent = "";
   }, 2200);
 }
 
@@ -647,11 +563,7 @@ shiftForm.addEventListener("submit", (event) => {
   );
 
   renderMonthOptions(getMonthKey(newShift.date));
-  showSavedMessage(
-    wasEditing || existingShiftIndex >= 0
-      ? "Смена обновлена"
-      : "Смена сохранена",
-  );
+  showSavedMessage();
   finishEditing();
 });
 
@@ -659,34 +571,12 @@ navigationButtons.forEach((button) => {
   button.addEventListener("click", () => showPage(button.dataset.page));
 });
 
-monthPickerButton.addEventListener("click", openMonthPicker);
-closeMonthPickerButton.addEventListener("click", closeMonthPicker);
-
-monthOptions.addEventListener("scroll", handleMonthWheelScroll);
-
-confirmMonthButton.addEventListener("click", () => {
-  if (availableMonthKeys.length === 0) {
-    closeMonthPicker();
-    return;
-  }
-
-  // Ещё раз читаем положение колеса перед подтверждением.
-  selectedMonthIndex = Math.min(
-    availableMonthKeys.length - 1,
-    Math.max(0, Math.round(monthOptions.scrollTop / 54)),
-  );
-
-  const selectedMonth = availableMonthKeys[selectedMonthIndex];
-  monthSelect.value = selectedMonth;
-  selectedMonthText.textContent = formatMonthName(selectedMonth);
-  renderShifts();
-  closeMonthPicker();
+previousHistoryMonthButton.addEventListener("click", () => {
+  changeHistoryMonth(1);
 });
 
-monthPickerOverlay.addEventListener("click", (event) => {
-  if (event.target === monthPickerOverlay) {
-    closeMonthPicker();
-  }
+nextHistoryMonthButton.addEventListener("click", () => {
+  changeHistoryMonth(-1);
 });
 
 closeShiftActionsButton.addEventListener("click", () => closeShiftActions());
@@ -746,19 +636,16 @@ timePickerOverlay.addEventListener("click", (event) => {
   }
 });
 
-hourWheel.addEventListener("scroll", () => {
-  handleWheelScroll(hourWheel, "hour");
-});
-
-minuteWheel.addEventListener("scroll", () => {
-  handleWheelScroll(minuteWheel, "minute");
-});
+increaseHourButton.addEventListener("click", () => changeTimePart("hour", 1));
+decreaseHourButton.addEventListener("click", () => changeTimePart("hour", -1));
+increaseMinuteButton.addEventListener("click", () =>
+  changeTimePart("minute", 1),
+);
+decreaseMinuteButton.addEventListener("click", () =>
+  changeTimePart("minute", -1),
+);
 
 confirmTimeButton.addEventListener("click", () => {
-  // Перед подтверждением ещё раз читаем положение колёс.
-  selectedHour = getWheelValue(hourWheel, 23);
-  selectedMinute = getWheelValue(minuteWheel, 59);
-
   const timeValue = `${String(selectedHour).padStart(2, "0")}:${String(
     selectedMinute,
   ).padStart(2, "0")}`;
@@ -803,8 +690,6 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     if (!datePickerOverlay.hidden) {
       closeDatePicker();
-    } else if (!monthPickerOverlay.hidden) {
-      closeMonthPicker();
     } else if (!shiftActionsOverlay.hidden) {
       closeShiftActions();
     } else if (!timePickerOverlay.hidden) {
@@ -816,7 +701,6 @@ document.addEventListener("keydown", (event) => {
 // Начальные значения при первом открытии приложения.
 shiftDateInput.value = getTodayValue();
 updateSelectedDateText();
-createTimeWheelOptions();
 
 // Восстанавливаем время, которое пользователь сохранял в прошлый раз.
 try {
