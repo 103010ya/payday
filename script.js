@@ -52,6 +52,16 @@ const closeShiftActionsButton = document.querySelector(
 );
 const editShiftButton = document.querySelector("#editShiftButton");
 const deleteShiftButton = document.querySelector("#deleteShiftButton");
+const salaryEstimateOverlay = document.querySelector(
+  "#salaryEstimateOverlay",
+);
+const closeSalaryEstimateButton = document.querySelector(
+  "#closeSalaryEstimateButton",
+);
+const salaryEstimateMonth = document.querySelector("#salaryEstimateMonth");
+const salaryTotalHours = document.querySelector("#salaryTotalHours");
+const salaryFormula = document.querySelector("#salaryFormula");
+const salaryTotalAmount = document.querySelector("#salaryTotalAmount");
 const shiftList = document.querySelector("#shiftList");
 const emptyState = document.querySelector("#emptyState");
 const shiftCount = document.querySelector("#shiftCount");
@@ -67,6 +77,8 @@ let selectedHour = 0;
 let selectedMinute = 0;
 let availableMonthKeys = [];
 let selectedMonthIndex = 0;
+
+const HOURLY_RATE = 10320;
 
 // Возвращает сегодняшнюю дату в формате YYYY-MM-DD без сдвига часового пояса.
 function getTodayValue() {
@@ -311,6 +323,41 @@ function formatShiftDate(dateValue) {
   return dateValue.replaceAll("-", "/");
 }
 
+// Переводит время HH:MM в количество минут от начала суток.
+function timeToMinutes(timeValue) {
+  const [hours, minutes] = timeValue.split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
+// Возвращает длительность смены. Конец раньше начала означает переход через полночь.
+function getShiftDurationMinutes(shift) {
+  const startMinutes = timeToMinutes(shift.startTime);
+  let endMinutes = timeToMinutes(shift.endTime);
+
+  if (endMinutes < startMinutes) {
+    endMinutes += 24 * 60;
+  }
+
+  return endMinutes - startMinutes;
+}
+
+function formatHoursAndMinutes(totalMinutes) {
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  return minutes > 0 ? `${hours} ч ${minutes} мин` : `${hours} ч`;
+}
+
+function formatDecimalHours(totalMinutes) {
+  return new Intl.NumberFormat("ru-RU", {
+    maximumFractionDigits: 2,
+  }).format(totalMinutes / 60);
+}
+
+function formatWon(amount) {
+  return `${new Intl.NumberFormat("ru-RU").format(amount)} ₩`;
+}
+
 // Возвращает только те месяцы, в которых есть сохранённые смены.
 function getAvailableMonths(shifts) {
   const monthKeys = new Set();
@@ -368,6 +415,34 @@ function changeHistoryMonth(direction) {
     selectedMonthIndex >= availableMonthKeys.length - 1;
   nextHistoryMonthButton.disabled = selectedMonthIndex <= 0;
   renderShifts();
+}
+
+// Показывает примерную выплату за смены выбранного месяца.
+function openSalaryEstimate() {
+  const shiftsForMonth = getSavedShifts().filter(
+    (shift) => getMonthKey(shift.date) === monthSelect.value,
+  );
+  const totalMinutes = shiftsForMonth.reduce(
+    (sum, shift) => sum + getShiftDurationMinutes(shift),
+    0,
+  );
+  const estimatedAmount = Math.round((totalMinutes * HOURLY_RATE) / 60);
+
+  salaryEstimateMonth.textContent = formatMonthName(monthSelect.value);
+  salaryTotalHours.textContent = formatHoursAndMinutes(totalMinutes);
+  salaryFormula.textContent = `${formatDecimalHours(
+    totalMinutes,
+  )} × ${formatWon(HOURLY_RATE)} = ${formatWon(estimatedAmount)}`;
+  salaryTotalAmount.textContent = formatWon(estimatedAmount);
+  salaryEstimateOverlay.hidden = false;
+  document.body.classList.add("dialog-open");
+  closeSalaryEstimateButton.focus();
+}
+
+function closeSalaryEstimate() {
+  salaryEstimateOverlay.hidden = true;
+  document.body.classList.remove("dialog-open");
+  shiftCount.focus();
 }
 
 // Открывает меню действий для смены, на которую нажал пользователь.
@@ -579,6 +654,15 @@ nextHistoryMonthButton.addEventListener("click", () => {
   changeHistoryMonth(-1);
 });
 
+shiftCount.addEventListener("click", openSalaryEstimate);
+closeSalaryEstimateButton.addEventListener("click", closeSalaryEstimate);
+
+salaryEstimateOverlay.addEventListener("click", (event) => {
+  if (event.target === salaryEstimateOverlay) {
+    closeSalaryEstimate();
+  }
+});
+
 closeShiftActionsButton.addEventListener("click", () => closeShiftActions());
 
 shiftActionsOverlay.addEventListener("click", (event) => {
@@ -690,6 +774,8 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     if (!datePickerOverlay.hidden) {
       closeDatePicker();
+    } else if (!salaryEstimateOverlay.hidden) {
+      closeSalaryEstimate();
     } else if (!shiftActionsOverlay.hidden) {
       closeShiftActions();
     } else if (!timePickerOverlay.hidden) {

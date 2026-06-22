@@ -13,7 +13,7 @@
       content="Мобильное приложение для учёта рабочих смен"
     />
     <title>Учёт смен</title>
-    <link rel="stylesheet" href="styles.css?v=20260622-4" />
+    <link rel="stylesheet" href="styles.css?v=20260623-1" />
   </head>
 
   <body class="home-page-active">
@@ -129,7 +129,14 @@
             <div>
               <h1 id="historyTitle">История</h1>
             </div>
-            <span id="shiftCount" class="shift-count">0</span>
+            <button
+              id="shiftCount"
+              class="shift-count"
+              type="button"
+              aria-label="Открыть расчёт примерной выплаты"
+            >
+              0
+            </button>
           </div>
 
           <div class="month-picker-card">
@@ -293,6 +300,54 @@
       </div>
     </div>
 
+    <!-- Примерный расчёт выплаты за выбранный месяц -->
+    <div id="salaryEstimateOverlay" class="salary-estimate-overlay" hidden>
+      <div
+        class="salary-estimate-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="salaryEstimateTitle"
+      >
+        <div class="salary-estimate-dialog__header">
+          <div>
+            <p
+              id="salaryEstimateMonth"
+              class="salary-estimate-dialog__caption"
+            ></p>
+            <h2 id="salaryEstimateTitle">Расчёт примерной выплаты</h2>
+          </div>
+          <button
+            id="closeSalaryEstimateButton"
+            class="close-dialog-button"
+            type="button"
+            aria-label="Закрыть расчёт"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m6 6 12 12M18 6 6 18" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="salary-estimate-details">
+          <div class="salary-estimate-row">
+            <span>Количество часов</span>
+            <strong id="salaryTotalHours">0</strong>
+          </div>
+          <div class="salary-estimate-row">
+            <span>Ставка за час</span>
+            <strong>10 320 ₩</strong>
+          </div>
+        </div>
+
+        <p id="salaryFormula" class="salary-estimate-formula"></p>
+
+        <div class="salary-estimate-total">
+          <span>Примерная выплата</span>
+          <strong id="salaryTotalAmount">0 ₩</strong>
+        </div>
+      </div>
+    </div>
+
     <!-- Выбор времени кнопками со стрелками -->
     <div id="timePickerOverlay" class="time-picker-overlay" hidden>
       <div
@@ -375,6 +430,6 @@
       </div>
     </div>
 
-    <script src="script.js?v=20260622-4"></script>
+    <script src="script.js?v=20260623-1"></script>
   </body>
 </html>
