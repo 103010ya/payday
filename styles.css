@@ -315,6 +315,32 @@ h1 {
   padding: 16px;
 }
 
+.history-controls {
+  position: sticky;
+  z-index: 5;
+  top: -1px;
+  padding: 1px 0 2px;
+  background: linear-gradient(
+    180deg,
+    rgba(247, 248, 249, 0.96) 0%,
+    rgba(242, 245, 247, 0.92) 100%
+  );
+  box-shadow: 0 14px 20px rgba(232, 236, 240, 0.45);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  transform: translateY(0);
+  transition:
+    transform 240ms ease,
+    opacity 180ms ease;
+  will-change: transform;
+}
+
+.history-controls--hidden {
+  opacity: 0;
+  transform: translateY(calc(-100% - 8px));
+  pointer-events: none;
+}
+
 .history-month-control {
   display: grid;
   grid-template-columns: 46px minmax(0, 1fr) 46px;
@@ -383,7 +409,11 @@ h1 {
 
 .history-scroll-area {
   min-height: 0;
-  padding: 2px 2px 8px;
+  margin: calc(-1 * max(34px, env(safe-area-inset-top))) -20px 0;
+  padding:
+    max(34px, env(safe-area-inset-top))
+    22px
+    12px;
   flex: 1;
   overflow-y: auto;
   background: transparent;

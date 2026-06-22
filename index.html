@@ -13,7 +13,7 @@
       content="Мобильное приложение для учёта рабочих смен"
     />
     <title>Учёт смен</title>
-    <link rel="stylesheet" href="styles.css?v=20260622-2" />
+    <link rel="stylesheet" href="styles.css?v=20260622-3" />
   </head>
 
   <body class="home-page-active">
@@ -125,46 +125,52 @@
           aria-labelledby="historyTitle"
           hidden
         >
-          <div class="calendar-heading">
-            <div>
-              <h1 id="historyTitle">История</h1>
-            </div>
-            <span id="shiftCount" class="shift-count">0</span>
-          </div>
-
-          <div class="month-picker-card">
-            <!-- Скрытое поле хранит выбранный месяц для JavaScript -->
-            <input id="monthSelect" name="monthSelect" type="hidden" />
-
-            <div class="history-month-control">
-              <button
-                id="previousHistoryMonthButton"
-                class="history-month-arrow"
-                type="button"
-                aria-label="Предыдущий сохранённый месяц"
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="m15 18-6-6 6-6" />
-                </svg>
-              </button>
-
-              <span id="selectedMonthText" class="history-month-control__value"></span>
-
-              <button
-                id="nextHistoryMonthButton"
-                class="history-month-arrow"
-                type="button"
-                aria-label="Следующий сохранённый месяц"
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="m9 18 6-6-6-6" />
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          <!-- Прокручивается только эта область со сменами -->
+          <!-- Вся история прокручивается как единая область -->
           <div class="history-scroll-area">
+            <!-- Панель скрывается вниз по списку и возвращается при прокрутке вверх -->
+            <div id="historyControls" class="history-controls">
+              <div class="calendar-heading">
+                <div>
+                  <h1 id="historyTitle">История</h1>
+                </div>
+                <span id="shiftCount" class="shift-count">0</span>
+              </div>
+
+              <div class="month-picker-card">
+                <!-- Скрытое поле хранит выбранный месяц для JavaScript -->
+                <input id="monthSelect" name="monthSelect" type="hidden" />
+
+                <div class="history-month-control">
+                  <button
+                    id="previousHistoryMonthButton"
+                    class="history-month-arrow"
+                    type="button"
+                    aria-label="Предыдущий сохранённый месяц"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="m15 18-6-6 6-6" />
+                    </svg>
+                  </button>
+
+                  <span
+                    id="selectedMonthText"
+                    class="history-month-control__value"
+                  ></span>
+
+                  <button
+                    id="nextHistoryMonthButton"
+                    class="history-month-arrow"
+                    type="button"
+                    aria-label="Следующий сохранённый месяц"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="m9 18 6-6-6-6" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <!-- JavaScript добавит сюда карточки сохранённых смен -->
             <div id="shiftList" class="shift-list"></div>
 
@@ -375,6 +381,6 @@
       </div>
     </div>
 
-    <script src="script.js?v=20260622-2"></script>
+    <script src="script.js?v=20260622-3"></script>
   </body>
 </html>

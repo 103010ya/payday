@@ -55,6 +55,8 @@ const deleteShiftButton = document.querySelector("#deleteShiftButton");
 const shiftList = document.querySelector("#shiftList");
 const emptyState = document.querySelector("#emptyState");
 const shiftCount = document.querySelector("#shiftCount");
+const historyScrollArea = document.querySelector(".history-scroll-area");
+const historyControls = document.querySelector("#historyControls");
 const navigationButtons = document.querySelectorAll(".nav-button");
 const pages = document.querySelectorAll(".page");
 
@@ -67,6 +69,7 @@ let selectedHour = 0;
 let selectedMinute = 0;
 let availableMonthKeys = [];
 let selectedMonthIndex = 0;
+let previousHistoryScrollTop = 0;
 
 // Возвращает сегодняшнюю дату в формате YYYY-MM-DD без сдвига часового пояса.
 function getTodayValue() {
@@ -368,6 +371,23 @@ function changeHistoryMonth(direction) {
     selectedMonthIndex >= availableMonthKeys.length - 1;
   nextHistoryMonthButton.disabled = selectedMonthIndex <= 0;
   renderShifts();
+  historyScrollArea.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+// Скрывает верхнюю панель при движении вниз и возвращает при движении вверх.
+function handleHistoryScroll() {
+  const currentScrollTop = historyScrollArea.scrollTop;
+  const scrollDifference = currentScrollTop - previousHistoryScrollTop;
+
+  if (currentScrollTop <= 8) {
+    historyControls.classList.remove("history-controls--hidden");
+  } else if (scrollDifference > 4) {
+    historyControls.classList.add("history-controls--hidden");
+  } else if (scrollDifference < -4) {
+    historyControls.classList.remove("history-controls--hidden");
+  }
+
+  previousHistoryScrollTop = currentScrollTop;
 }
 
 // Открывает меню действий для смены, на которую нажал пользователь.
@@ -503,6 +523,8 @@ function showPage(pageId) {
   if (pageId === "calendarPage") {
     renderMonthOptions();
     renderShifts();
+    previousHistoryScrollTop = historyScrollArea.scrollTop;
+    historyControls.classList.remove("history-controls--hidden");
   }
 
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -577,6 +599,10 @@ previousHistoryMonthButton.addEventListener("click", () => {
 
 nextHistoryMonthButton.addEventListener("click", () => {
   changeHistoryMonth(-1);
+});
+
+historyScrollArea.addEventListener("scroll", handleHistoryScroll, {
+  passive: true,
 });
 
 closeShiftActionsButton.addEventListener("click", () => closeShiftActions());
