@@ -18,6 +18,10 @@
 
 * {
   box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 html {
@@ -45,7 +49,7 @@ body {
 
 button {
   font: inherit;
-  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 body.dialog-open {
@@ -84,31 +88,62 @@ body.history-page-active .app-content {
   min-height: 100vh;
   margin: 0 auto;
   background: transparent;
+  overflow: hidden;
 }
 
 .app-content {
+  --page-slide-offset: 40px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   min-height: 100vh;
   padding: max(34px, env(safe-area-inset-top)) 20px
     calc(116px + env(safe-area-inset-bottom));
   background: transparent;
+  overflow: hidden;
 }
 
 .page {
-  animation: page-in 260ms ease;
+  grid-area: 1 / 1;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  opacity: 0.6;
+  transform: translateX(100%);
+  pointer-events: none;
+  will-change: transform, opacity;
+  transition:
+    transform 380ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 260ms ease;
 }
 
-#homePage:not([hidden]) {
+#homePage {
   display: flex;
-  min-height: calc(100dvh - 150px - env(safe-area-inset-top));
+  height: 100%;
   flex-direction: column;
   justify-content: center;
 }
 
-#calendarPage:not([hidden]) {
+#calendarPage {
   display: flex;
   height: 100%;
   min-height: 0;
   flex-direction: column;
+}
+
+.page--active {
+  z-index: 2;
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+.page--left {
+  transform: translateX(calc(-100% - var(--page-slide-offset)));
+}
+
+.page--right {
+  transform: translateX(calc(100% + var(--page-slide-offset)));
 }
 
 .home-clock-icon {
@@ -1066,20 +1101,9 @@ h1 {
   }
 }
 
-@keyframes page-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 @media (max-width: 370px) {
   .app-content {
+    --page-slide-offset: 30px;
     padding-right: 15px;
     padding-left: 15px;
   }

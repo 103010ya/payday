@@ -67,8 +67,13 @@ const emptyState = document.querySelector("#emptyState");
 const shiftCount = document.querySelector("#shiftCount");
 const navigationButtons = document.querySelectorAll(".nav-button");
 const pages = document.querySelectorAll(".page");
+const pageOrder = {
+  homePage: 0,
+  calendarPage: 1,
+};
 
 let messageTimer;
+let activePageId = "homePage";
 let visibleCalendarMonth = new Date();
 let selectedShiftId = null;
 let editingShiftId = null;
@@ -77,6 +82,9 @@ let selectedHour = 0;
 let selectedMinute = 0;
 let availableMonthKeys = [];
 let selectedMonthIndex = 0;
+let swipeStartX = 0;
+let swipeStartY = 0;
+let swipeTracking = false;
 
 const HOURLY_RATE = 10320;
 
@@ -553,15 +561,37 @@ function showSavedMessage(message = "") {
 
 // Переключает видимый раздел и выделяет активную кнопку внизу.
 function showPage(pageId) {
+  if (!(pageId in pageOrder)) {
+    return;
+  }
+
+  if (pageId === activePageId) {
+    return;
+  }
+
   document.body.classList.toggle("home-page-active", pageId === "homePage");
   document.body.classList.toggle(
     "history-page-active",
     pageId === "calendarPage",
   );
 
+  if (pageId === "calendarPage") {
+    // Обновляем данные до начала анимации, чтобы экран появился уже готовым.
+    renderMonthOptions();
+    renderShifts();
+  }
+
+  const activePageIndex = pageOrder[pageId];
+
   pages.forEach((page) => {
     const isActive = page.id === pageId;
-    page.hidden = !isActive;
+    const pageIndex = pageOrder[page.id];
+
+    page.classList.toggle("page--active", isActive);
+    page.classList.toggle("page--left", !isActive && pageIndex < activePageIndex);
+    page.classList.toggle("page--right", !isActive && pageIndex > activePageIndex);
+    page.setAttribute("aria-hidden", String(!isActive));
+    page.inert = !isActive;
   });
 
   navigationButtons.forEach((button) => {
@@ -575,12 +605,7 @@ function showPage(pageId) {
     }
   });
 
-  if (pageId === "calendarPage") {
-    renderMonthOptions();
-    renderShifts();
-  }
-
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  activePageId = pageId;
 }
 
 // Сохраняет новую смену или обновляет выбранную запись.
@@ -645,6 +670,53 @@ shiftForm.addEventListener("submit", (event) => {
 navigationButtons.forEach((button) => {
   button.addEventListener("click", () => showPage(button.dataset.page));
 });
+
+// Переключение разделов горизонтальным свайпом.
+document.querySelector(".app-content").addEventListener(
+  "touchstart",
+  (event) => {
+    if (document.body.classList.contains("dialog-open")) {
+      return;
+    }
+
+    const touch = event.changedTouches[0];
+    swipeStartX = touch.clientX;
+    swipeStartY = touch.clientY;
+    swipeTracking = true;
+  },
+  { passive: true },
+);
+
+document.querySelector(".app-content").addEventListener(
+  "touchend",
+  (event) => {
+    if (!swipeTracking) {
+      return;
+    }
+
+    swipeTracking = false;
+    const touch = event.changedTouches[0];
+    const horizontalDistance = touch.clientX - swipeStartX;
+    const verticalDistance = touch.clientY - swipeStartY;
+    const isHorizontalSwipe =
+      Math.abs(horizontalDistance) >= 60 &&
+      Math.abs(horizontalDistance) > Math.abs(verticalDistance) * 1.35;
+
+    if (!isHorizontalSwipe) {
+      return;
+    }
+
+    if (horizontalDistance < 0 && activePageId === "homePage") {
+      showPage("calendarPage");
+    } else if (
+      horizontalDistance > 0 &&
+      activePageId === "calendarPage"
+    ) {
+      showPage("homePage");
+    }
+  },
+  { passive: true },
+);
 
 previousHistoryMonthButton.addEventListener("click", () => {
   changeHistoryMonth(1);
