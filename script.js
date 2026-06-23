@@ -854,8 +854,8 @@ loginForm.addEventListener("submit", async (event) => {
 
   try {
     await loginAccount(
-      formData.get("loginEmail").trim(),
-      formData.get("loginPassword"),
+      formData.get("username").trim(),
+      formData.get("password"),
     );
     loginForm.reset();
   } catch (error) {
@@ -878,9 +878,9 @@ registerForm.addEventListener("submit", async (event) => {
 
   try {
     await registerAccount(
-      formData.get("registerName").trim(),
-      formData.get("registerEmail").trim(),
-      formData.get("registerPassword"),
+      formData.get("name").trim(),
+      formData.get("email").trim(),
+      formData.get("new-password"),
     );
     registerForm.reset();
   } catch (error) {
@@ -891,7 +891,7 @@ registerForm.addEventListener("submit", async (event) => {
 });
 
 forgotPasswordButton.addEventListener("click", async () => {
-  const email = new FormData(loginForm).get("loginEmail").trim();
+  const email = new FormData(loginForm).get("username").trim();
 
   if (!email) {
     setAuthMessage("Сначала введите email", true);

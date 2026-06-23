@@ -82,6 +82,23 @@ body.history-page-active .app-content {
   overflow: hidden;
 }
 
+/* В профиле фиксируем всю страницу, чтобы iPhone не растягивал её вниз. */
+body.profile-page-active {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+body.profile-page-active .app-shell,
+body.profile-page-active .app-content {
+  height: 100dvh;
+  min-height: 100dvh;
+  overflow: hidden;
+}
+
 .app-shell {
   position: relative;
   width: min(100%, 520px);
@@ -137,12 +154,7 @@ body.history-page-active .app-content {
   min-height: 0;
   padding-top: 4px;
   flex-direction: column;
-  overflow-y: auto;
-  scrollbar-width: none;
-}
-
-#profilePage::-webkit-scrollbar {
-  display: none;
+  overflow: hidden;
 }
 
 .page--active {
@@ -431,6 +443,48 @@ body.history-page-active .app-content {
   font-weight: 700;
   background: rgba(255, 255, 255, 0.72);
   cursor: pointer;
+}
+
+/* На невысоком экране уменьшаем отступы, чтобы профиль помещался без прокрутки. */
+@media (max-height: 700px) {
+  .profile-page__header {
+    margin-bottom: 14px;
+  }
+
+  .profile-page__eyebrow {
+    display: none;
+  }
+
+  .profile-card {
+    padding: 14px;
+  }
+
+  .auth-tabs {
+    margin-bottom: 14px;
+  }
+
+  .auth-form {
+    gap: 10px;
+  }
+
+  .auth-field {
+    gap: 5px;
+  }
+
+  .auth-field input,
+  .auth-submit-button {
+    min-height: 46px;
+  }
+
+  .account-avatar {
+    width: 58px;
+    height: 58px;
+    margin-bottom: 10px;
+  }
+
+  .account-email {
+    margin-bottom: 12px;
+  }
 }
 
 h1 {
