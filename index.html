@@ -13,7 +13,7 @@
       content="Мобильное приложение для учёта рабочих смен"
     />
     <title>Учёт смен</title>
-    <link rel="stylesheet" href="styles.css?v=20260623-2" />
+    <link rel="stylesheet" href="styles.css?v=20260624-1" />
   </head>
 
   <body class="home-page-active">
@@ -26,11 +26,16 @@
           aria-label="Добавление смены"
           aria-hidden="false"
         >
-          <div class="home-clock-icon" aria-hidden="true">
+          <button
+            id="profileButton"
+            class="home-clock-icon"
+            type="button"
+            aria-label="Открыть профиль"
+          >
             <svg viewBox="0 0 24 24">
               <path d="M12 7v5l3.5 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
             </svg>
-          </div>
+          </button>
 
           <form id="shiftForm" class="shift-form">
             <div class="field">
@@ -185,6 +190,154 @@
               <div class="empty-state__icon" aria-hidden="true">—</div>
               <p>Нет сохранённых смен за этот месяц</p>
             </div>
+          </div>
+        </section>
+
+        <!-- Экран регистрации, входа и состояния облачной синхронизации -->
+        <section
+          id="profilePage"
+          class="page page--right"
+          aria-labelledby="profileTitle"
+          aria-hidden="true"
+          inert
+        >
+          <div class="profile-page__header">
+            <button
+              id="closeProfileButton"
+              class="profile-back-button"
+              type="button"
+              aria-label="Вернуться на главную"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="m15 18-6-6 6-6" />
+              </svg>
+            </button>
+
+            <div>
+              <p class="profile-page__eyebrow">Облачное сохранение</p>
+              <h1 id="profileTitle">Профиль</h1>
+            </div>
+          </div>
+
+          <div class="profile-card">
+            <div id="authGuestView">
+              <div class="auth-tabs" role="tablist" aria-label="Авторизация">
+                <button
+                  id="loginTabButton"
+                  class="auth-tab auth-tab--active"
+                  type="button"
+                  role="tab"
+                  aria-selected="true"
+                  aria-controls="loginForm"
+                >
+                  Вход
+                </button>
+                <button
+                  id="registerTabButton"
+                  class="auth-tab"
+                  type="button"
+                  role="tab"
+                  aria-selected="false"
+                  aria-controls="registerForm"
+                >
+                  Регистрация
+                </button>
+              </div>
+
+              <form id="loginForm" class="auth-form">
+                <label class="auth-field">
+                  <span>Email</span>
+                  <input
+                    type="email"
+                    name="loginEmail"
+                    autocomplete="email"
+                    placeholder="name@example.com"
+                    required
+                  />
+                </label>
+
+                <label class="auth-field">
+                  <span>Пароль</span>
+                  <input
+                    type="password"
+                    name="loginPassword"
+                    autocomplete="current-password"
+                    placeholder="Введите пароль"
+                    required
+                  />
+                </label>
+
+                <button class="auth-submit-button" type="submit">Войти</button>
+                <button
+                  id="forgotPasswordButton"
+                  class="forgot-password-button"
+                  type="button"
+                >
+                  Забыли пароль?
+                </button>
+              </form>
+
+              <form id="registerForm" class="auth-form" hidden>
+                <label class="auth-field">
+                  <span>Имя</span>
+                  <input
+                    type="text"
+                    name="registerName"
+                    autocomplete="name"
+                    placeholder="Ваше имя"
+                    required
+                  />
+                </label>
+
+                <label class="auth-field">
+                  <span>Email</span>
+                  <input
+                    type="email"
+                    name="registerEmail"
+                    autocomplete="email"
+                    placeholder="name@example.com"
+                    required
+                  />
+                </label>
+
+                <label class="auth-field">
+                  <span>Пароль</span>
+                  <input
+                    type="password"
+                    name="registerPassword"
+                    autocomplete="new-password"
+                    minlength="6"
+                    placeholder="Минимум 6 символов"
+                    required
+                  />
+                </label>
+
+                <button class="auth-submit-button" type="submit">
+                  Создать профиль
+                </button>
+              </form>
+            </div>
+
+            <div id="authUserView" class="account-view" hidden>
+              <div class="account-avatar" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4.5 21a7.5 7.5 0 0 1 15 0" />
+                </svg>
+              </div>
+              <h2 id="accountName">Пользователь</h2>
+              <p id="accountEmail" class="account-email"></p>
+              <div class="account-sync-status">
+                <span class="account-sync-status__dot"></span>
+                <span id="accountSyncText">Данные синхронизированы</span>
+              </div>
+              <button id="logoutButton" class="logout-button" type="button">
+                Выйти из профиля
+              </button>
+            </div>
+
+            <p id="authPreviewMessage" class="auth-preview-message" role="status">
+              Подключение Firebase ожидает настройки
+            </p>
           </div>
         </section>
       </main>
@@ -436,6 +589,6 @@
       </div>
     </div>
 
-    <script src="script.js?v=20260623-2"></script>
+    <script type="module" src="script.js?v=20260624-1"></script>
   </body>
 </html>

@@ -1,3 +1,16 @@
+import {
+  deleteCloudShift,
+  isFirebaseConfigured,
+  loadCloudShifts,
+  loginAccount,
+  logoutAccount,
+  observeAuthState,
+  registerAccount,
+  resetAccountPassword,
+  saveCloudShift,
+  uploadCloudShifts,
+} from "./firebase-service.js";
+
 // Ключ, под которым список смен хранится внутри localStorage.
 const STORAGE_KEY = "paydayShifts";
 // Отдельный ключ для последних введённых значений времени.
@@ -5,6 +18,20 @@ const LAST_TIME_KEY = "paydayLastShiftTime";
 
 // Получаем нужные элементы страницы один раз при запуске приложения.
 const shiftForm = document.querySelector("#shiftForm");
+const profileButton = document.querySelector("#profileButton");
+const closeProfileButton = document.querySelector("#closeProfileButton");
+const loginTabButton = document.querySelector("#loginTabButton");
+const registerTabButton = document.querySelector("#registerTabButton");
+const loginForm = document.querySelector("#loginForm");
+const registerForm = document.querySelector("#registerForm");
+const forgotPasswordButton = document.querySelector("#forgotPasswordButton");
+const authGuestView = document.querySelector("#authGuestView");
+const authUserView = document.querySelector("#authUserView");
+const accountName = document.querySelector("#accountName");
+const accountEmail = document.querySelector("#accountEmail");
+const accountSyncText = document.querySelector("#accountSyncText");
+const logoutButton = document.querySelector("#logoutButton");
+const authPreviewMessage = document.querySelector("#authPreviewMessage");
 const shiftDateInput = document.querySelector("#shiftDate");
 const datePickerButton = document.querySelector("#datePickerButton");
 const selectedDateText = document.querySelector("#selectedDateText");
@@ -70,13 +97,16 @@ const pages = document.querySelectorAll(".page");
 const pageOrder = {
   homePage: 0,
   calendarPage: 1,
+  profilePage: 2,
 };
 
 let messageTimer;
 let activePageId = "homePage";
+let currentUser = null;
 let visibleCalendarMonth = new Date();
 let selectedShiftId = null;
 let editingShiftId = null;
+let editingOriginalDate = null;
 let activeTimeField = null;
 let selectedHour = 0;
 let selectedMinute = 0;
@@ -282,9 +312,13 @@ function closeTimePicker(restoreFocus = true) {
 }
 
 // Безопасно читает сохранённые смены. Если данных ещё нет, возвращает пустой список.
+function getActiveStorageKey() {
+  return currentUser ? `${STORAGE_KEY}:${currentUser.uid}` : STORAGE_KEY;
+}
+
 function getSavedShifts() {
   try {
-    const savedData = localStorage.getItem(STORAGE_KEY);
+    const savedData = localStorage.getItem(getActiveStorageKey());
     const parsedData = savedData ? JSON.parse(savedData) : [];
 
     if (!Array.isArray(parsedData)) {
@@ -304,7 +338,7 @@ function getSavedShifts() {
 
 // Полностью обновляет список смен в localStorage.
 function saveShifts(shifts) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(shifts));
+  localStorage.setItem(getActiveStorageKey(), JSON.stringify(shifts));
 }
 
 // Создаёт ключ месяца YYYY-MM из полной даты смены.
@@ -477,6 +511,7 @@ function closeShiftActions(restoreFocus = true) {
 // Возвращает форму в обычный режим создания новой смены.
 function finishEditing() {
   editingShiftId = null;
+  editingOriginalDate = null;
   saveButton.textContent = "Сохранить";
   cancelEditButton.hidden = true;
 }
@@ -574,6 +609,10 @@ function showPage(pageId) {
     "history-page-active",
     pageId === "calendarPage",
   );
+  document.body.classList.toggle(
+    "profile-page-active",
+    pageId === "profilePage",
+  );
 
   if (pageId === "calendarPage") {
     // Обновляем данные до начала анимации, чтобы экран появился уже готовым.
@@ -608,8 +647,132 @@ function showPage(pageId) {
   activePageId = pageId;
 }
 
+function showAuthForm(formName) {
+  const isLogin = formName === "login";
+
+  loginForm.hidden = !isLogin;
+  registerForm.hidden = isLogin;
+  loginTabButton.classList.toggle("auth-tab--active", isLogin);
+  registerTabButton.classList.toggle("auth-tab--active", !isLogin);
+  loginTabButton.setAttribute("aria-selected", String(isLogin));
+  registerTabButton.setAttribute("aria-selected", String(!isLogin));
+  authPreviewMessage.textContent = isFirebaseConfigured
+    ? ""
+    : "Подключение Firebase ожидает настройки";
+}
+
+function setAuthMessage(message, isError = false) {
+  authPreviewMessage.textContent = message;
+  authPreviewMessage.classList.toggle("auth-preview-message--error", isError);
+}
+
+function setAuthLoading(form, isLoading) {
+  const submitButton = form.querySelector('button[type="submit"]');
+  submitButton.disabled = isLoading;
+  submitButton.textContent = isLoading
+    ? "Подождите…"
+    : form === loginForm
+      ? "Войти"
+      : "Создать профиль";
+}
+
+function getFirebaseErrorMessage(error) {
+  const messages = {
+    "auth/email-already-in-use": "Профиль с таким email уже существует",
+    "auth/invalid-credential": "Неверный email или пароль",
+    "auth/invalid-email": "Проверьте правильность email",
+    "auth/missing-password": "Введите пароль",
+    "auth/configuration-not-found":
+      "Включите Email/Password в настройках Firebase Authentication",
+    "auth/operation-not-allowed":
+      "Включите Email/Password в настройках Firebase Authentication",
+    "auth/weak-password": "Пароль должен содержать минимум 6 символов",
+    "auth/too-many-requests": "Слишком много попыток. Попробуйте позже",
+    "auth/network-request-failed": "Нет соединения с интернетом",
+  };
+
+  return messages[error.code] || "Не удалось выполнить операцию";
+}
+
+function updateAccountView(user) {
+  const isSignedIn = Boolean(user);
+
+  authGuestView.hidden = isSignedIn;
+  authUserView.hidden = !isSignedIn;
+
+  if (isSignedIn) {
+    accountName.textContent = user.displayName || "Пользователь";
+    accountEmail.textContent = user.email || "";
+    setAuthMessage("");
+  } else {
+    showAuthForm("login");
+  }
+}
+
+function refreshShiftInterface(preferredMonth) {
+  renderMonthOptions(preferredMonth);
+  renderShifts();
+}
+
+async function synchronizeUserShifts(user) {
+  accountSyncText.textContent = "Синхронизация данных…";
+
+  let guestShifts = [];
+
+  try {
+    const savedGuestData = JSON.parse(
+      localStorage.getItem(STORAGE_KEY) || "[]",
+    );
+    guestShifts = Array.isArray(savedGuestData) ? savedGuestData : [];
+  } catch (error) {
+    // Повреждённые локальные данные не должны мешать входу в профиль.
+    console.error("Не удалось прочитать локальные смены:", error);
+  }
+
+  const cloudShifts = await loadCloudShifts(user.uid);
+  const mergedByDate = new Map();
+
+  guestShifts.forEach((shift) => mergedByDate.set(shift.date, shift));
+  cloudShifts.forEach((shift) => mergedByDate.set(shift.date, shift));
+
+  const mergedShifts = [...mergedByDate.values()];
+  localStorage.setItem(
+    `${STORAGE_KEY}:${user.uid}`,
+    JSON.stringify(mergedShifts),
+  );
+
+  const cloudDates = new Set(cloudShifts.map((shift) => shift.date));
+  const shiftsToUpload = guestShifts.filter(
+    (shift) => !cloudDates.has(shift.date),
+  );
+
+  await uploadCloudShifts(user.uid, shiftsToUpload);
+  accountSyncText.textContent = "Данные синхронизированы";
+  refreshShiftInterface();
+}
+
+async function saveShiftOnline(shift, previousDate = null) {
+  if (!currentUser || !isFirebaseConfigured) {
+    return;
+  }
+
+  try {
+    accountSyncText.textContent = "Синхронизация данных…";
+
+    if (previousDate && previousDate !== shift.date) {
+      await deleteCloudShift(currentUser.uid, previousDate);
+    }
+
+    await saveCloudShift(currentUser.uid, shift);
+    accountSyncText.textContent = "Данные синхронизированы";
+  } catch (error) {
+    accountSyncText.textContent = "Сохранено на устройстве";
+    console.error("Не удалось синхронизировать смену:", error);
+  }
+}
+
 // Сохраняет новую смену или обновляет выбранную запись.
-shiftForm.addEventListener("submit", (event) => {
+shiftForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
   if (!startTimeInput.value || !endTimeInput.value) {
@@ -626,6 +789,7 @@ shiftForm.addEventListener("submit", (event) => {
 
   const shifts = getSavedShifts();
   const wasEditing = Boolean(editingShiftId);
+  const previousDate = wasEditing ? editingOriginalDate : null;
   const existingShiftIndex = shifts.findIndex((shift) => {
     if (wasEditing) {
       return shift.id === editingShiftId;
@@ -665,10 +829,95 @@ shiftForm.addEventListener("submit", (event) => {
   renderMonthOptions(getMonthKey(newShift.date));
   showSavedMessage();
   finishEditing();
+  await saveShiftOnline(newShift, previousDate);
 });
 
 navigationButtons.forEach((button) => {
   button.addEventListener("click", () => showPage(button.dataset.page));
+});
+
+profileButton.addEventListener("click", () => showPage("profilePage"));
+closeProfileButton.addEventListener("click", () => showPage("homePage"));
+loginTabButton.addEventListener("click", () => showAuthForm("login"));
+registerTabButton.addEventListener("click", () => showAuthForm("register"));
+
+loginForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+
+  if (!isFirebaseConfigured) {
+    setAuthMessage("Сначала добавьте конфигурацию Firebase", true);
+    return;
+  }
+
+  const formData = new FormData(loginForm);
+  setAuthLoading(loginForm, true);
+
+  try {
+    await loginAccount(
+      formData.get("loginEmail").trim(),
+      formData.get("loginPassword"),
+    );
+    loginForm.reset();
+  } catch (error) {
+    setAuthMessage(getFirebaseErrorMessage(error), true);
+  } finally {
+    setAuthLoading(loginForm, false);
+  }
+});
+
+registerForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+
+  if (!isFirebaseConfigured) {
+    setAuthMessage("Сначала добавьте конфигурацию Firebase", true);
+    return;
+  }
+
+  const formData = new FormData(registerForm);
+  setAuthLoading(registerForm, true);
+
+  try {
+    await registerAccount(
+      formData.get("registerName").trim(),
+      formData.get("registerEmail").trim(),
+      formData.get("registerPassword"),
+    );
+    registerForm.reset();
+  } catch (error) {
+    setAuthMessage(getFirebaseErrorMessage(error), true);
+  } finally {
+    setAuthLoading(registerForm, false);
+  }
+});
+
+forgotPasswordButton.addEventListener("click", async () => {
+  const email = new FormData(loginForm).get("loginEmail").trim();
+
+  if (!email) {
+    setAuthMessage("Сначала введите email", true);
+    return;
+  }
+
+  if (!isFirebaseConfigured) {
+    setAuthMessage("Сначала добавьте конфигурацию Firebase", true);
+    return;
+  }
+
+  try {
+    await resetAccountPassword(email);
+    setAuthMessage("Письмо для восстановления отправлено");
+  } catch (error) {
+    setAuthMessage(getFirebaseErrorMessage(error), true);
+  }
+});
+
+logoutButton.addEventListener("click", async () => {
+  try {
+    await logoutAccount();
+    showPage("homePage");
+  } catch (error) {
+    setAuthMessage("Не удалось выйти из профиля", true);
+  }
 });
 
 // Переключение разделов горизонтальным свайпом.
@@ -708,10 +957,7 @@ document.querySelector(".app-content").addEventListener(
 
     if (horizontalDistance < 0 && activePageId === "homePage") {
       showPage("calendarPage");
-    } else if (
-      horizontalDistance > 0 &&
-      activePageId === "calendarPage"
-    ) {
+    } else if (horizontalDistance > 0 && activePageId !== "homePage") {
       showPage("homePage");
     }
   },
@@ -752,6 +998,7 @@ editShiftButton.addEventListener("click", () => {
   }
 
   editingShiftId = shift.id;
+  editingOriginalDate = shift.date;
   shiftDateInput.value = shift.date;
   setTimeValue("start", shift.startTime);
   setTimeValue("end", shift.endTime);
@@ -763,7 +1010,10 @@ editShiftButton.addEventListener("click", () => {
   showPage("homePage");
 });
 
-deleteShiftButton.addEventListener("click", () => {
+deleteShiftButton.addEventListener("click", async () => {
+  const deletedShift = getSavedShifts().find(
+    (shift) => shift.id === selectedShiftId,
+  );
   const remainingShifts = getSavedShifts().filter(
     (shift) => shift.id !== selectedShiftId,
   );
@@ -773,6 +1023,16 @@ deleteShiftButton.addEventListener("click", () => {
   renderMonthOptions();
   renderShifts();
   selectedShiftId = null;
+
+  if (currentUser && deletedShift) {
+    try {
+      await deleteCloudShift(currentUser.uid, deletedShift.date);
+      accountSyncText.textContent = "Данные синхронизированы";
+    } catch (error) {
+      accountSyncText.textContent = "Удалено только на устройстве";
+      console.error("Не удалось удалить смену из облака:", error);
+    }
+  }
 });
 
 cancelEditButton.addEventListener("click", () => {
@@ -871,6 +1131,26 @@ try {
 } catch (error) {
   console.error("Не удалось восстановить последнее время смены:", error);
 }
+
+updateAccountView(null);
+
+observeAuthState(async (user) => {
+  currentUser = user;
+  updateAccountView(user);
+
+  if (!user) {
+    refreshShiftInterface();
+    return;
+  }
+
+  try {
+    await synchronizeUserShifts(user);
+  } catch (error) {
+    accountSyncText.textContent = "Не удалось загрузить облачные данные";
+    refreshShiftInterface();
+    console.error("Ошибка загрузки Firestore:", error);
+  }
+});
 
 renderMonthOptions();
 renderShifts();
