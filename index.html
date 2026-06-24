@@ -468,7 +468,7 @@
       </div>
     </div>
 
-    <!-- Примерный расчёт выплаты за выбранный месяц -->
+    <!-- Детальный расчёт часов и примерной выплаты за выбранный месяц -->
     <div id="salaryEstimateOverlay" class="salary-estimate-overlay" hidden>
       <div
         class="salary-estimate-dialog"
@@ -498,16 +498,11 @@
 
         <div class="salary-estimate-details">
           <div class="salary-estimate-row">
-            <span>Количество часов</span>
+            <span>Всего часов</span>
             <strong id="salaryTotalHours">0</strong>
           </div>
-          <div class="salary-estimate-row">
-            <span>Ставка за час</span>
-            <strong>10 320 ₩</strong>
-          </div>
+          <div id="salaryBreakdown" class="salary-breakdown"></div>
         </div>
-
-        <p id="salaryFormula" class="salary-estimate-formula"></p>
 
         <div class="salary-estimate-total">
           <span>Примерная выплата</span>

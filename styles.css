@@ -1013,7 +1013,7 @@ body.profile-page-active .bottom-navigation {
 
 .salary-estimate-details {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   margin-top: 22px;
   padding: 16px;
   border-radius: 17px;
@@ -1033,16 +1033,38 @@ body.profile-page-active .bottom-navigation {
   color: var(--text-main);
 }
 
-.salary-estimate-formula {
-  margin: 18px 0;
+.salary-breakdown {
+  display: grid;
+  gap: 8px;
+}
+
+.salary-breakdown-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 3px 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(138, 146, 155, 0.22);
   color: var(--text-muted);
-  font-size: 0.85rem;
+  font-size: 0.84rem;
+}
+
+.salary-breakdown-row strong {
+  color: var(--text-main);
+  font-size: 0.9rem;
+  text-align: right;
+}
+
+.salary-breakdown-row small {
+  grid-column: 1 / -1;
+  color: rgba(104, 112, 122, 0.78);
+  font-size: 0.72rem;
   text-align: center;
 }
 
 .salary-estimate-total {
   display: grid;
   gap: 8px;
+  margin-top: 16px;
   padding: 17px;
   border-radius: 17px;
   color: #ffffff;

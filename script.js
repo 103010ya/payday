@@ -87,7 +87,7 @@ const closeSalaryEstimateButton = document.querySelector(
 );
 const salaryEstimateMonth = document.querySelector("#salaryEstimateMonth");
 const salaryTotalHours = document.querySelector("#salaryTotalHours");
-const salaryFormula = document.querySelector("#salaryFormula");
+const salaryBreakdown = document.querySelector("#salaryBreakdown");
 const salaryTotalAmount = document.querySelector("#salaryTotalAmount");
 const shiftList = document.querySelector("#shiftList");
 const emptyState = document.querySelector("#emptyState");
@@ -116,7 +116,51 @@ let swipeStartX = 0;
 let swipeStartY = 0;
 let swipeTracking = false;
 
-const HOURLY_RATE = 10320;
+// Ставки оплаты. Если ставки изменятся, достаточно поправить числа здесь.
+const PAY_CATEGORIES = {
+  regular: {
+    label: "Обычные часы",
+    rate: 10320,
+  },
+  overtime: {
+    label: "Сверхурочные",
+    rate: 15480,
+  },
+  weekend: {
+    label: "Выходные",
+    rate: 15480,
+  },
+  weekendOvertime: {
+    label: "Выходные сверхурочные",
+    rate: 20640,
+  },
+  night: {
+    label: "Ночные",
+    rate: 15480,
+  },
+  weekendNight: {
+    label: "Ночные в выходной",
+    rate: 20640,
+  },
+  nightOvertime: {
+    label: "Ночные сверхурочные",
+    rate: 25800,
+  },
+};
+
+const PAY_CATEGORY_ORDER = [
+  "regular",
+  "overtime",
+  "weekend",
+  "weekendOvertime",
+  "night",
+  "weekendNight",
+  "nightOvertime",
+];
+
+const OVERTIME_START_MINUTE = 8 * 60;
+const UNPAID_BREAK_START_MINUTE = 8 * 60;
+const UNPAID_BREAK_DURATION_MINUTES = 90;
 
 // Возвращает сегодняшнюю дату в формате YYYY-MM-DD без сдвига часового пояса.
 function getTodayValue() {
@@ -390,14 +434,150 @@ function formatHoursAndMinutes(totalMinutes) {
   return minutes > 0 ? `${hours} ч ${minutes} мин` : `${hours} ч`;
 }
 
-function formatDecimalHours(totalMinutes) {
-  return new Intl.NumberFormat("ru-RU", {
-    maximumFractionDigits: 2,
-  }).format(totalMinutes / 60);
-}
-
 function formatWon(amount) {
   return `${new Intl.NumberFormat("ru-RU").format(amount)} ₩`;
+}
+
+// Создаёт точную дату и время начала смены.
+function getShiftStartDateTime(shift) {
+  const startDate = inputValueToDate(shift.date);
+  const [hours, minutes] = shift.startTime.split(":").map(Number);
+
+  startDate.setHours(hours, minutes, 0, 0);
+
+  return startDate;
+}
+
+// Суббота и воскресенье считаются выходными.
+function isWeekendDate(date) {
+  const day = date.getDay();
+
+  return day === 0 || day === 6;
+}
+
+// Ночной промежуток: с 22:00 до 06:00.
+function isNightMinute(date) {
+  const hour = date.getHours();
+
+  return hour >= 22 || hour < 6;
+}
+
+// Определяет категорию оплаты для одной конкретной минуты работы.
+function getPayCategoryForMinute(date, paidMinuteIndex) {
+  const isOvertime = paidMinuteIndex >= OVERTIME_START_MINUTE;
+  const isWeekend = isWeekendDate(date);
+  const isNight = isNightMinute(date);
+
+  // Ночная переработка имеет самую высокую ставку.
+  if (isNight && isOvertime) {
+    return "nightOvertime";
+  }
+
+  if (isNight && isWeekend) {
+    return "weekendNight";
+  }
+
+  if (isNight) {
+    return "night";
+  }
+
+  if (isWeekend && isOvertime) {
+    return "weekendOvertime";
+  }
+
+  if (isWeekend) {
+    return "weekend";
+  }
+
+  if (isOvertime) {
+    return "overtime";
+  }
+
+  return "regular";
+}
+
+// Разбивает одну смену по категориям оплаты.
+function calculateShiftPayBreakdown(shift) {
+  const breakdown = Object.fromEntries(
+    PAY_CATEGORY_ORDER.map((category) => [category, 0]),
+  );
+  const startDateTime = getShiftStartDateTime(shift);
+  const durationMinutes = getShiftDurationMinutes(shift);
+  const hasUnpaidBreak = durationMinutes > UNPAID_BREAK_START_MINUTE;
+  let paidMinuteIndex = 0;
+
+  // Идём по каждой минуте, чтобы корректно учитывать ночь, выходные и переход через полночь.
+  for (let minuteIndex = 0; minuteIndex < durationMinutes; minuteIndex += 1) {
+    const isUnpaidBreakMinute =
+      hasUnpaidBreak &&
+      minuteIndex >= UNPAID_BREAK_START_MINUTE &&
+      minuteIndex <
+        UNPAID_BREAK_START_MINUTE + UNPAID_BREAK_DURATION_MINUTES;
+
+    // Если смена больше 8 часов, перерыв не попадает в оплачиваемое время.
+    if (isUnpaidBreakMinute) {
+      continue;
+    }
+
+    const currentMinute = new Date(
+      startDateTime.getTime() + minuteIndex * 60 * 1000,
+    );
+    const category = getPayCategoryForMinute(currentMinute, paidMinuteIndex);
+
+    breakdown[category] += 1;
+    paidMinuteIndex += 1;
+  }
+
+  return breakdown;
+}
+
+// Складывает расчёт всех смен выбранного месяца.
+function calculateMonthPaySummary(shifts) {
+  const breakdown = Object.fromEntries(
+    PAY_CATEGORY_ORDER.map((category) => [category, 0]),
+  );
+
+  shifts.forEach((shift) => {
+    const shiftBreakdown = calculateShiftPayBreakdown(shift);
+
+    PAY_CATEGORY_ORDER.forEach((category) => {
+      breakdown[category] += shiftBreakdown[category];
+    });
+  });
+
+  const totalMinutes = PAY_CATEGORY_ORDER.reduce(
+    (sum, category) => sum + breakdown[category],
+    0,
+  );
+  const totalAmount = PAY_CATEGORY_ORDER.reduce((sum, category) => {
+    const rate = PAY_CATEGORIES[category].rate;
+
+    return sum + Math.round((breakdown[category] * rate) / 60);
+  }, 0);
+
+  return {
+    breakdown,
+    totalMinutes,
+    totalAmount,
+  };
+}
+
+// Создаёт строку с количеством часов по одной категории.
+function createSalaryBreakdownRow(category, minutes) {
+  const row = document.createElement("div");
+  row.className = "salary-breakdown-row";
+
+  const label = document.createElement("span");
+  label.textContent = PAY_CATEGORIES[category].label;
+
+  const value = document.createElement("strong");
+  value.textContent = formatHoursAndMinutes(minutes);
+
+  const rate = document.createElement("small");
+  rate.textContent = `${formatWon(PAY_CATEGORIES[category].rate)}/ч`;
+
+  row.append(label, value, rate);
+  return row;
 }
 
 // Возвращает только те месяцы, в которых есть сохранённые смены.
@@ -464,18 +644,21 @@ function openSalaryEstimate() {
   const shiftsForMonth = getSavedShifts().filter(
     (shift) => getMonthKey(shift.date) === monthSelect.value,
   );
-  const totalMinutes = shiftsForMonth.reduce(
-    (sum, shift) => sum + getShiftDurationMinutes(shift),
-    0,
-  );
-  const estimatedAmount = Math.round((totalMinutes * HOURLY_RATE) / 60);
+  const paySummary = calculateMonthPaySummary(shiftsForMonth);
 
   salaryEstimateMonth.textContent = formatMonthName(monthSelect.value);
-  salaryTotalHours.textContent = formatHoursAndMinutes(totalMinutes);
-  salaryFormula.textContent = `${formatDecimalHours(
-    totalMinutes,
-  )} × ${formatWon(HOURLY_RATE)} = ${formatWon(estimatedAmount)}`;
-  salaryTotalAmount.textContent = formatWon(estimatedAmount);
+  salaryTotalHours.textContent = formatHoursAndMinutes(paySummary.totalMinutes);
+  salaryBreakdown.replaceChildren();
+
+  PAY_CATEGORY_ORDER.forEach((category) => {
+    const minutes = paySummary.breakdown[category];
+
+    if (minutes > 0) {
+      salaryBreakdown.append(createSalaryBreakdownRow(category, minutes));
+    }
+  });
+
+  salaryTotalAmount.textContent = formatWon(paySummary.totalAmount);
   salaryEstimateOverlay.hidden = false;
   document.body.classList.add("dialog-open");
   closeSalaryEstimateButton.focus();
