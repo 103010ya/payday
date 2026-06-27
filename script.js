@@ -804,9 +804,22 @@ function closeSalaryEstimate() {
   salaryEstimateOverlay.hidden = true;
   document.body.classList.remove("dialog-open");
   document.activeElement?.blur();
-  window.scrollTo(0, 0);
-  historyScrollArea.scrollTop = 0;
-  shiftCount.focus();
+  resetHistoryPosition();
+}
+
+// Возвращает историю в верхнюю позицию после закрытия всплывающего окна.
+// На iPhone Safari сдвиг экрана иногда происходит не сразу, поэтому повторяем
+// сброс несколько раз с небольшой задержкой.
+function resetHistoryPosition() {
+  const reset = () => {
+    window.scrollTo(0, 0);
+    historyScrollArea.scrollTop = 0;
+  };
+
+  reset();
+  window.requestAnimationFrame(reset);
+  window.setTimeout(reset, 120);
+  window.setTimeout(reset, 320);
 }
 
 // Открывает меню действий для смены, на которую нажал пользователь.

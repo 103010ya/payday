@@ -86,6 +86,9 @@ body.home-page-active .app-content {
 
 /* В истории прокручивается только список смен, а верхняя часть остаётся на месте. */
 body.history-page-active {
+  position: fixed;
+  inset: 0;
+  width: 100%;
   height: 100dvh;
   overflow: hidden;
 }
