@@ -90,6 +90,8 @@ export function saveCloudShift(userId, shift) {
       date: shift.date,
       startTime: shift.startTime,
       endTime: shift.endTime,
+      lunchBreakMinutes: Number(shift.lunchBreakMinutes) || 0,
+      dinnerBreakMinutes: Number(shift.dinnerBreakMinutes) || 0,
       updatedAt: firestore.serverTimestamp(),
     },
   );
@@ -114,6 +116,8 @@ export async function uploadCloudShifts(userId, shifts) {
       date: shift.date,
       startTime: shift.startTime,
       endTime: shift.endTime,
+      lunchBreakMinutes: Number(shift.lunchBreakMinutes) || 0,
+      dinnerBreakMinutes: Number(shift.dinnerBreakMinutes) || 0,
       updatedAt: firestore.serverTimestamp(),
     });
   });

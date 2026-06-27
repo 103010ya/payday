@@ -15,6 +15,8 @@ import {
 const STORAGE_KEY = "paydayShifts";
 // Отдельный ключ для последних введённых значений времени.
 const LAST_TIME_KEY = "paydayLastShiftTime";
+// Базовая ставка за час для расчёта зарплаты.
+const BASE_RATE_KEY = "paydayBaseRate";
 
 // Получаем нужные элементы страницы один раз при запуске приложения.
 const shiftForm = document.querySelector("#shiftForm");
@@ -33,6 +35,10 @@ const accountSyncText = document.querySelector("#accountSyncText");
 const logoutButton = document.querySelector("#logoutButton");
 const authPreviewMessage = document.querySelector("#authPreviewMessage");
 const shiftDateInput = document.querySelector("#shiftDate");
+const previousShiftDateButton = document.querySelector(
+  "#previousShiftDateButton",
+);
+const nextShiftDateButton = document.querySelector("#nextShiftDateButton");
 const datePickerButton = document.querySelector("#datePickerButton");
 const selectedDateText = document.querySelector("#selectedDateText");
 const datePickerOverlay = document.querySelector("#datePickerOverlay");
@@ -43,10 +49,8 @@ const nextMonthButton = document.querySelector("#nextMonthButton");
 const todayButton = document.querySelector("#todayButton");
 const startTimeInput = document.querySelector("#startTime");
 const endTimeInput = document.querySelector("#endTime");
-const startTimeButton = document.querySelector("#startTimeButton");
-const endTimeButton = document.querySelector("#endTimeButton");
-const startTimeText = document.querySelector("#startTimeText");
-const endTimeText = document.querySelector("#endTimeText");
+const lunchBreakInput = document.querySelector("#lunchBreak");
+const dinnerBreakInput = document.querySelector("#dinnerBreak");
 const timePickerOverlay = document.querySelector("#timePickerOverlay");
 const timePickerTitle = document.querySelector("#timePickerTitle");
 const closeTimePickerButton = document.querySelector(
@@ -86,6 +90,7 @@ const closeSalaryEstimateButton = document.querySelector(
   "#closeSalaryEstimateButton",
 );
 const salaryEstimateMonth = document.querySelector("#salaryEstimateMonth");
+const baseRateInput = document.querySelector("#baseRateInput");
 const salaryTotalHours = document.querySelector("#salaryTotalHours");
 const salaryBreakdown = document.querySelector("#salaryBreakdown");
 const salaryTotalAmount = document.querySelector("#salaryTotalAmount");
@@ -115,36 +120,37 @@ let selectedMonthIndex = 0;
 let swipeStartX = 0;
 let swipeStartY = 0;
 let swipeTracking = false;
+let keyboardFocusTimer;
 
-// Ставки оплаты. Если ставки изменятся, достаточно поправить числа здесь.
+// Категории оплаты. Сумма считается как «основная ставка × коэффициент».
 const PAY_CATEGORIES = {
   regular: {
     label: "Обычные часы",
-    rate: 10320,
+    multiplier: 1,
   },
   overtime: {
     label: "Сверхурочные",
-    rate: 15480,
+    multiplier: 1.5,
   },
   weekend: {
     label: "Выходные",
-    rate: 15480,
+    multiplier: 1.5,
   },
   weekendOvertime: {
     label: "Выходные сверхурочные",
-    rate: 20640,
+    multiplier: 2,
   },
   night: {
     label: "Ночные",
-    rate: 15480,
+    multiplier: 1.5,
   },
   weekendNight: {
     label: "Ночные в выходной",
-    rate: 20640,
+    multiplier: 2,
   },
   nightOvertime: {
     label: "Ночные сверхурочные",
-    rate: 25800,
+    multiplier: 2.5,
   },
 };
 
@@ -159,8 +165,7 @@ const PAY_CATEGORY_ORDER = [
 ];
 
 const OVERTIME_START_MINUTE = 8 * 60;
-const UNPAID_BREAK_START_MINUTE = 8 * 60;
-const UNPAID_BREAK_DURATION_MINUTES = 90;
+const DEFAULT_BASE_RATE = 10320;
 
 // Возвращает сегодняшнюю дату в формате YYYY-MM-DD без сдвига часового пояса.
 function getTodayValue() {
@@ -291,14 +296,26 @@ function closeDatePicker() {
   datePickerButton.focus();
 }
 
-// Записывает время в скрытое поле и обновляет текст видимой кнопки.
+// Быстро меняет дату смены стрелками на главной.
+function changeShiftDateByDays(dayStep) {
+  const selectedDate = inputValueToDate(shiftDateInput.value);
+
+  selectedDate.setDate(selectedDate.getDate() + dayStep);
+  shiftDateInput.value = dateToInputValue(selectedDate);
+  visibleCalendarMonth = new Date(
+    selectedDate.getFullYear(),
+    selectedDate.getMonth(),
+    1,
+  );
+  updateSelectedDateText();
+}
+
+// Записывает время в поле начала или конца смены.
 function setTimeValue(fieldName, timeValue) {
   const isStartTime = fieldName === "start";
   const input = isStartTime ? startTimeInput : endTimeInput;
-  const text = isStartTime ? startTimeText : endTimeText;
 
   input.value = timeValue;
-  text.textContent = timeValue || "--:--";
 }
 
 // Обновляет крупные значения часов и минут во всплывающем окне.
@@ -333,10 +350,6 @@ function openTimePicker(fieldName) {
   timePickerOverlay.hidden = false;
   document.body.classList.add("dialog-open");
 
-  const activeButton =
-    fieldName === "start" ? startTimeButton : endTimeButton;
-  activeButton.setAttribute("aria-expanded", "true");
-
   renderTimeStepper();
 
   closeTimePickerButton.focus();
@@ -346,12 +359,10 @@ function closeTimePicker(restoreFocus = true) {
   timePickerOverlay.hidden = true;
   document.body.classList.remove("dialog-open");
 
-  const activeButton =
-    activeTimeField === "start" ? startTimeButton : endTimeButton;
-  activeButton?.setAttribute("aria-expanded", "false");
-
   if (restoreFocus) {
-    activeButton?.focus();
+    const activeInput =
+      activeTimeField === "start" ? startTimeInput : endTimeInput;
+    activeInput?.focus();
   }
 }
 
@@ -438,6 +449,77 @@ function formatWon(amount) {
   return `${new Intl.NumberFormat("ru-RU").format(amount)} ₩`;
 }
 
+function formatMultiplier(multiplier) {
+  return new Intl.NumberFormat("ru-RU", {
+    maximumFractionDigits: 2,
+  }).format(multiplier);
+}
+
+// Превращает длительность перерыва в минуты.
+// Можно вводить «01:00» или просто «60».
+function breakValueToMinutes(value) {
+  const cleanValue = value.trim();
+
+  if (!cleanValue) {
+    return 0;
+  }
+
+  if (cleanValue.includes(":")) {
+    const [hours = "0", minutes = "0"] = cleanValue.split(":");
+    const parsedHours = Number(hours);
+    const parsedMinutes = Number(minutes);
+
+    if (
+      Number.isNaN(parsedHours) ||
+      Number.isNaN(parsedMinutes) ||
+      parsedHours < 0 ||
+      parsedMinutes < 0 ||
+      parsedMinutes > 59
+    ) {
+      return null;
+    }
+
+    return parsedHours * 60 + parsedMinutes;
+  }
+
+  const parsedMinutes = Number(cleanValue);
+
+  if (Number.isNaN(parsedMinutes) || parsedMinutes < 0) {
+    return null;
+  }
+
+  return parsedMinutes;
+}
+
+// Приводит минуты перерыва к виду HH:MM для сохранения и повторного показа.
+function formatBreakValue(totalMinutes) {
+  const safeMinutes = Math.max(0, Number(totalMinutes) || 0);
+  const hours = Math.floor(safeMinutes / 60);
+  const minutes = safeMinutes % 60;
+
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function getShiftBreakMinutes(shift) {
+  return (
+    (Number(shift.lunchBreakMinutes) || 0) +
+    (Number(shift.dinnerBreakMinutes) || 0)
+  );
+}
+
+function getBaseRate() {
+  const savedRate = Number(localStorage.getItem(BASE_RATE_KEY));
+
+  return savedRate > 0 ? savedRate : DEFAULT_BASE_RATE;
+}
+
+function setBaseRate(rate) {
+  const safeRate = Math.max(0, Number(rate) || 0);
+
+  localStorage.setItem(BASE_RATE_KEY, String(safeRate || DEFAULT_BASE_RATE));
+  baseRateInput.value = String(safeRate || DEFAULT_BASE_RATE);
+}
+
 // Создаёт точную дату и время начала смены.
 function getShiftStartDateTime(shift) {
   const startDate = inputValueToDate(shift.date);
@@ -503,22 +585,14 @@ function calculateShiftPayBreakdown(shift) {
   );
   const startDateTime = getShiftStartDateTime(shift);
   const durationMinutes = getShiftDurationMinutes(shift);
-  const hasUnpaidBreak = durationMinutes > UNPAID_BREAK_START_MINUTE;
+  const paidDurationMinutes = Math.max(
+    0,
+    durationMinutes - getShiftBreakMinutes(shift),
+  );
   let paidMinuteIndex = 0;
 
-  // Идём по каждой минуте, чтобы корректно учитывать ночь, выходные и переход через полночь.
-  for (let minuteIndex = 0; minuteIndex < durationMinutes; minuteIndex += 1) {
-    const isUnpaidBreakMinute =
-      hasUnpaidBreak &&
-      minuteIndex >= UNPAID_BREAK_START_MINUTE &&
-      minuteIndex <
-        UNPAID_BREAK_START_MINUTE + UNPAID_BREAK_DURATION_MINUTES;
-
-    // Если смена больше 8 часов, перерыв не попадает в оплачиваемое время.
-    if (isUnpaidBreakMinute) {
-      continue;
-    }
-
+  // Идём только по оплачиваемым минутам. Перерывы уже вычтены из общей длительности.
+  for (let minuteIndex = 0; minuteIndex < paidDurationMinutes; minuteIndex += 1) {
     const currentMinute = new Date(
       startDateTime.getTime() + minuteIndex * 60 * 1000,
     );
@@ -532,7 +606,7 @@ function calculateShiftPayBreakdown(shift) {
 }
 
 // Складывает расчёт всех смен выбранного месяца.
-function calculateMonthPaySummary(shifts) {
+function calculateMonthPaySummary(shifts, baseRate) {
   const breakdown = Object.fromEntries(
     PAY_CATEGORY_ORDER.map((category) => [category, 0]),
   );
@@ -550,7 +624,7 @@ function calculateMonthPaySummary(shifts) {
     0,
   );
   const totalAmount = PAY_CATEGORY_ORDER.reduce((sum, category) => {
-    const rate = PAY_CATEGORIES[category].rate;
+    const rate = baseRate * PAY_CATEGORIES[category].multiplier;
 
     return sum + Math.round((breakdown[category] * rate) / 60);
   }, 0);
@@ -563,7 +637,7 @@ function calculateMonthPaySummary(shifts) {
 }
 
 // Создаёт строку с количеством часов по одной категории.
-function createSalaryBreakdownRow(category, minutes) {
+function createSalaryBreakdownRow(category, minutes, baseRate) {
   const row = document.createElement("div");
   row.className = "salary-breakdown-row";
 
@@ -574,7 +648,10 @@ function createSalaryBreakdownRow(category, minutes) {
   value.textContent = formatHoursAndMinutes(minutes);
 
   const rate = document.createElement("small");
-  rate.textContent = `${formatWon(PAY_CATEGORIES[category].rate)}/ч`;
+  const multiplier = PAY_CATEGORIES[category].multiplier;
+  const hourlyRate = Math.round(baseRate * multiplier);
+
+  rate.textContent = `×${formatMultiplier(multiplier)} · ${formatWon(hourlyRate)}/ч`;
 
   row.append(label, value, rate);
   return row;
@@ -639,14 +716,16 @@ function changeHistoryMonth(direction) {
   renderShifts();
 }
 
-// Показывает примерную выплату за смены выбранного месяца.
-function openSalaryEstimate() {
+// Перерисовывает расчёт без закрытия окна.
+function renderSalaryEstimate() {
   const shiftsForMonth = getSavedShifts().filter(
     (shift) => getMonthKey(shift.date) === monthSelect.value,
   );
-  const paySummary = calculateMonthPaySummary(shiftsForMonth);
+  const baseRate = getBaseRate();
+  const paySummary = calculateMonthPaySummary(shiftsForMonth, baseRate);
 
   salaryEstimateMonth.textContent = formatMonthName(monthSelect.value);
+  baseRateInput.value = String(baseRate);
   salaryTotalHours.textContent = formatHoursAndMinutes(paySummary.totalMinutes);
   salaryBreakdown.replaceChildren();
 
@@ -654,11 +733,18 @@ function openSalaryEstimate() {
     const minutes = paySummary.breakdown[category];
 
     if (minutes > 0) {
-      salaryBreakdown.append(createSalaryBreakdownRow(category, minutes));
+      salaryBreakdown.append(
+        createSalaryBreakdownRow(category, minutes, baseRate),
+      );
     }
   });
 
   salaryTotalAmount.textContent = formatWon(paySummary.totalAmount);
+}
+
+// Показывает примерную выплату за смены выбранного месяца.
+function openSalaryEstimate() {
+  renderSalaryEstimate();
   salaryEstimateOverlay.hidden = false;
   document.body.classList.add("dialog-open");
   closeSalaryEstimateButton.focus();
@@ -719,8 +805,16 @@ function createShiftCard(shift) {
 
   const startRow = createTimeRow("Начало смены", shift.startTime);
   const endRow = createTimeRow("Конец смены", shift.endTime);
+  const breakMinutes = getShiftBreakMinutes(shift);
 
   details.append(startRow, endRow);
+
+  if (breakMinutes > 0) {
+    details.append(
+      createTimeRow("Перерыв", formatHoursAndMinutes(breakMinutes)),
+    );
+  }
+
   card.append(date, details);
   card.addEventListener("click", () => openShiftActions(shift));
 
@@ -775,6 +869,44 @@ function showSavedMessage(message = "") {
     saveMessage.classList.remove("save-message--text");
     saveMessageText.textContent = "";
   }, 2200);
+}
+
+function isEditableField(element) {
+  return (
+    element instanceof HTMLInputElement &&
+    element.type !== "hidden" &&
+    !element.readOnly &&
+    !element.disabled
+  );
+}
+
+// На телефоне клавиатура уменьшает видимую область. Подводим активное поле так,
+// чтобы пользователь видел, что вводит.
+function scrollFocusedFieldIntoView(field) {
+  window.clearTimeout(keyboardFocusTimer);
+
+  keyboardFocusTimer = window.setTimeout(() => {
+    field.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+      inline: "nearest",
+    });
+  }, 260);
+}
+
+function openKeyboardMode(field) {
+  document.body.classList.add("keyboard-open");
+  scrollFocusedFieldIntoView(field);
+}
+
+function closeKeyboardModeIfNeeded() {
+  window.clearTimeout(keyboardFocusTimer);
+
+  keyboardFocusTimer = window.setTimeout(() => {
+    if (!isEditableField(document.activeElement)) {
+      document.body.classList.remove("keyboard-open");
+    }
+  }, 120);
 }
 
 // Переключает видимый раздел и выделяет активную кнопку внизу.
@@ -963,11 +1095,32 @@ shiftForm.addEventListener("submit", async (event) => {
     return;
   }
 
+  const lunchBreakMinutes = breakValueToMinutes(lunchBreakInput.value);
+  const dinnerBreakMinutes = breakValueToMinutes(dinnerBreakInput.value);
+
+  if (lunchBreakMinutes === null || dinnerBreakMinutes === null) {
+    showSavedMessage("Перерыв укажите в формате 01:00");
+    return;
+  }
+
+  if (
+    lunchBreakMinutes + dinnerBreakMinutes >=
+    getShiftDurationMinutes({
+      startTime: startTimeInput.value,
+      endTime: endTimeInput.value,
+    })
+  ) {
+    showSavedMessage("Перерывы больше смены");
+    return;
+  }
+
   const newShift = {
     id: `${Date.now()}-${crypto.randomUUID?.() || Math.random().toString(16).slice(2)}`,
     date: shiftDateInput.value,
     startTime: startTimeInput.value,
     endTime: endTimeInput.value,
+    lunchBreakMinutes,
+    dinnerBreakMinutes,
   };
 
   const shifts = getSavedShifts();
@@ -1006,6 +1159,8 @@ shiftForm.addEventListener("submit", async (event) => {
     JSON.stringify({
       startTime: newShift.startTime,
       endTime: newShift.endTime,
+      lunchBreakMinutes: newShift.lunchBreakMinutes,
+      dinnerBreakMinutes: newShift.dinnerBreakMinutes,
     }),
   );
 
@@ -1147,6 +1302,23 @@ document.querySelector(".app-content").addEventListener(
   { passive: true },
 );
 
+document.addEventListener("focusin", (event) => {
+  if (isEditableField(event.target)) {
+    openKeyboardMode(event.target);
+  }
+});
+
+document.addEventListener("focusout", closeKeyboardModeIfNeeded);
+
+window.visualViewport?.addEventListener("resize", () => {
+  if (
+    document.body.classList.contains("keyboard-open") &&
+    isEditableField(document.activeElement)
+  ) {
+    scrollFocusedFieldIntoView(document.activeElement);
+  }
+});
+
 previousHistoryMonthButton.addEventListener("click", () => {
   changeHistoryMonth(1);
 });
@@ -1157,6 +1329,11 @@ nextHistoryMonthButton.addEventListener("click", () => {
 
 shiftCount.addEventListener("click", openSalaryEstimate);
 closeSalaryEstimateButton.addEventListener("click", closeSalaryEstimate);
+
+baseRateInput.addEventListener("change", () => {
+  setBaseRate(baseRateInput.value);
+  renderSalaryEstimate();
+});
 
 salaryEstimateOverlay.addEventListener("click", (event) => {
   if (event.target === salaryEstimateOverlay) {
@@ -1185,6 +1362,8 @@ editShiftButton.addEventListener("click", () => {
   shiftDateInput.value = shift.date;
   setTimeValue("start", shift.startTime);
   setTimeValue("end", shift.endTime);
+  lunchBreakInput.value = formatBreakValue(shift.lunchBreakMinutes || 0);
+  dinnerBreakInput.value = formatBreakValue(shift.dinnerBreakMinutes || 0);
   updateSelectedDateText();
   saveButton.textContent = "Сохранить изменения";
   cancelEditButton.hidden = false;
@@ -1224,8 +1403,13 @@ cancelEditButton.addEventListener("click", () => {
   updateSelectedDateText();
 });
 
-startTimeButton.addEventListener("click", () => openTimePicker("start"));
-endTimeButton.addEventListener("click", () => openTimePicker("end"));
+previousShiftDateButton.addEventListener("click", () => {
+  changeShiftDateByDays(-1);
+});
+
+nextShiftDateButton.addEventListener("click", () => {
+  changeShiftDateByDays(1);
+});
 
 closeTimePickerButton.addEventListener("click", () => closeTimePicker());
 
@@ -1310,10 +1494,14 @@ try {
   if (lastTime) {
     setTimeValue("start", lastTime.startTime || "");
     setTimeValue("end", lastTime.endTime || "");
+    lunchBreakInput.value = formatBreakValue(lastTime.lunchBreakMinutes || 0);
+    dinnerBreakInput.value = formatBreakValue(lastTime.dinnerBreakMinutes || 0);
   }
 } catch (error) {
   console.error("Не удалось восстановить последнее время смены:", error);
 }
+
+baseRateInput.value = String(getBaseRate());
 
 updateAccountView(null);
 

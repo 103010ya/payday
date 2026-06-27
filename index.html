@@ -13,7 +13,7 @@
       content="Мобильное приложение для учёта рабочих смен"
     />
     <title>Учёт смен</title>
-    <link rel="stylesheet" href="styles.css?v=20260624-2" />
+    <link rel="stylesheet" href="styles.css?v=20260627-1" />
   </head>
 
   <body class="home-page-active">
@@ -38,9 +38,20 @@
           </button>
 
           <form id="shiftForm" class="shift-form">
-            <div class="field">
+            <div class="date-field">
               <!-- Скрытое поле хранит дату в формате, который использует JavaScript -->
               <input id="shiftDate" name="shiftDate" type="hidden" required />
+
+              <button
+                id="previousShiftDateButton"
+                class="date-step-button"
+                type="button"
+                aria-label="Предыдущий день"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m15 5-7 7 7 7" />
+                </svg>
+              </button>
 
               <button
                 id="datePickerButton"
@@ -57,58 +68,67 @@
                   </svg>
                 </span>
               </button>
+
+              <button
+                id="nextShiftDateButton"
+                class="date-step-button"
+                type="button"
+                aria-label="Следующий день"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m9 5 7 7-7 7" />
+                </svg>
+              </button>
             </div>
 
             <div class="time-fields">
-              <div class="field">
-                <!-- Скрытое поле хранит выбранное время начала -->
+              <label class="time-field" for="startTime">
+                <span>Начало</span>
                 <input
                   id="startTime"
                   name="startTime"
-                  type="hidden"
+                  type="time"
                   required
                 />
-                <button
-                  id="startTimeButton"
-                  class="time-picker-button"
-                  type="button"
-                  aria-label="Выбрать время начала смены"
-                  aria-haspopup="dialog"
-                  aria-expanded="false"
-                >
-                  <span id="startTimeText">--:--</span>
-                  <span class="time-picker-button__icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24">
-                      <path d="M12 7v5l3.5 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                    </svg>
-                  </span>
-                </button>
-              </div>
+              </label>
 
-              <div class="field">
-                <!-- Скрытое поле хранит выбранное время окончания -->
+              <label class="time-field" for="endTime">
+                <span>Конец</span>
                 <input
                   id="endTime"
                   name="endTime"
-                  type="hidden"
+                  type="time"
                   required
                 />
-                <button
-                  id="endTimeButton"
-                  class="time-picker-button"
-                  type="button"
-                  aria-label="Выбрать время окончания смены"
-                  aria-haspopup="dialog"
-                  aria-expanded="false"
-                >
-                  <span id="endTimeText">--:--</span>
-                  <span class="time-picker-button__icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24">
-                      <path d="M12 7v5l3.5 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                    </svg>
-                  </span>
-                </button>
-              </div>
+              </label>
+            </div>
+
+            <div class="break-fields">
+              <label class="break-field" for="lunchBreak">
+                <span>Обед</span>
+                <input
+                  id="lunchBreak"
+                  name="lunchBreak"
+                  type="text"
+                  inputmode="numeric"
+                  autocomplete="off"
+                  placeholder="01:00"
+                  value="01:00"
+                />
+              </label>
+
+              <label class="break-field" for="dinnerBreak">
+                <span>Ужин</span>
+                <input
+                  id="dinnerBreak"
+                  name="dinnerBreak"
+                  type="text"
+                  inputmode="numeric"
+                  autocomplete="off"
+                  placeholder="00:30"
+                  value="00:00"
+                />
+              </label>
             </div>
 
             <button id="saveButton" class="save-button" type="submit">
@@ -496,6 +516,18 @@
           </button>
         </div>
 
+        <label class="base-rate-field" for="baseRateInput">
+          <span>Основная ставка</span>
+          <input
+            id="baseRateInput"
+            type="number"
+            inputmode="numeric"
+            min="0"
+            step="10"
+            value="10320"
+          />
+        </label>
+
         <div class="salary-estimate-details">
           <div class="salary-estimate-row">
             <span>Всего часов</span>
@@ -593,6 +625,6 @@
       </div>
     </div>
 
-    <script type="module" src="script.js?v=20260624-2"></script>
+    <script type="module" src="script.js?v=20260627-1"></script>
   </body>
 </html>

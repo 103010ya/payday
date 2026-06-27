@@ -42,6 +42,7 @@ body {
   min-height: 100vh;
   margin: 0;
   color: var(--text-main);
+  font-weight: 400;
   font-family:
     Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background: transparent;
@@ -50,6 +51,12 @@ body {
 button {
   font: inherit;
   touch-action: manipulation;
+}
+
+input,
+textarea {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 body.dialog-open {
@@ -97,6 +104,46 @@ body.profile-page-active .app-content {
   height: 100dvh;
   min-height: 100dvh;
   overflow: hidden;
+}
+
+/* Когда открыта мобильная клавиатура, временно разрешаем странице подвинуть поле ввода в видимую область. */
+body.keyboard-open {
+  overflow: auto;
+}
+
+body.keyboard-open.home-page-active,
+body.keyboard-open.history-page-active,
+body.keyboard-open.profile-page-active {
+  position: static;
+  height: auto;
+  min-height: 100dvh;
+  overflow: auto;
+}
+
+body.keyboard-open .app-shell,
+body.keyboard-open .app-content {
+  height: auto;
+  min-height: 100dvh;
+  overflow: visible;
+}
+
+body.keyboard-open .app-content {
+  padding-bottom: calc(190px + env(safe-area-inset-bottom));
+}
+
+body.keyboard-open #homePage {
+  justify-content: flex-start;
+  padding-top: 28px;
+}
+
+body.keyboard-open #profilePage {
+  overflow: visible;
+}
+
+body.keyboard-open .bottom-navigation {
+  opacity: 0;
+  transform: translateY(calc(100% + 48px));
+  pointer-events: none;
 }
 
 .app-shell {
@@ -220,7 +267,7 @@ body.profile-page-active .app-content {
   margin: 0 0 5px;
   color: var(--text-muted);
   font-size: 0.72rem;
-  font-weight: 700;
+  font-weight: 500;
   letter-spacing: 0.09em;
   text-transform: uppercase;
 }
@@ -274,7 +321,7 @@ body.profile-page-active .app-content {
   border: 0;
   border-radius: 12px;
   color: var(--text-muted);
-  font-weight: 700;
+  font-weight: 500;
   background: transparent;
   cursor: pointer;
 }
@@ -302,7 +349,7 @@ body.profile-page-active .app-content {
 .auth-field span {
   color: #4d5259;
   font-size: 0.78rem;
-  font-weight: 680;
+  font-weight: 500;
 }
 
 .auth-field input {
@@ -331,7 +378,7 @@ body.profile-page-active .app-content {
   border: 0;
   border-radius: 15px;
   color: #ffffff;
-  font-weight: 750;
+  font-weight: 600;
   background: var(--button);
   cursor: pointer;
 }
@@ -348,7 +395,7 @@ body.profile-page-active .app-content {
   border: 0;
   color: var(--text-muted);
   font-size: 0.8rem;
-  font-weight: 650;
+  font-weight: 500;
   background: transparent;
   cursor: pointer;
 }
@@ -422,7 +469,7 @@ body.profile-page-active .app-content {
   gap: 9px;
   color: #35644b;
   font-size: 0.82rem;
-  font-weight: 650;
+  font-weight: 500;
   background: rgba(232, 246, 237, 0.86);
 }
 
@@ -440,7 +487,7 @@ body.profile-page-active .app-content {
   border: 1px solid var(--border);
   border-radius: 15px;
   color: #9a4141;
-  font-weight: 700;
+  font-weight: 500;
   background: rgba(255, 255, 255, 0.72);
   cursor: pointer;
 }
@@ -490,7 +537,7 @@ body.profile-page-active .app-content {
 h1 {
   margin: 0;
   font-size: clamp(2rem, 10vw, 2.8rem);
-  font-weight: 720;
+  font-weight: 600;
   letter-spacing: -0.055em;
   line-height: 1;
 }
@@ -512,8 +559,16 @@ h1 {
   gap: 9px;
 }
 
+.date-field {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  gap: 8px;
+  align-items: center;
+}
+
 .date-picker-button,
-.time-picker-button {
+.time-picker-button,
+.date-step-button {
   position: relative;
   display: flex;
   width: 100%;
@@ -534,11 +589,18 @@ h1 {
 }
 
 .date-picker-button:focus-visible,
-.time-picker-button:focus-visible {
+.time-picker-button:focus-visible,
+.date-step-button:focus-visible {
   border-color: rgba(23, 25, 28, 0.42);
   outline: none;
   background: var(--surface-strong);
   box-shadow: 0 0 0 4px rgba(23, 25, 28, 0.06);
+}
+
+.date-step-button {
+  min-height: 44px;
+  padding: 0;
+  border-radius: 14px;
 }
 
 .date-picker-button__icon,
@@ -550,7 +612,8 @@ h1 {
 }
 
 .date-picker-button__icon svg,
-.time-picker-button__icon svg {
+.time-picker-button__icon svg,
+.date-step-button svg {
   width: 20px;
   height: 20px;
   fill: none;
@@ -572,6 +635,82 @@ h1 {
   margin-top: 18px;
 }
 
+.break-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.time-field,
+.break-field,
+.base-rate-field {
+  display: grid;
+  gap: 7px;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  font-weight: 450;
+  text-align: center;
+}
+
+.time-field input,
+.break-field input,
+.base-rate-field input {
+  width: 100%;
+  padding: 0 12px;
+  border: 1px solid rgba(196, 201, 207, 0.72);
+  border-radius: 15px;
+  color: var(--text-main);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 400;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.78);
+  outline: none;
+}
+
+.time-field input {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.time-field input::-webkit-date-and-time-value {
+  width: 100%;
+  margin: 0;
+  text-align: center;
+}
+
+.time-field input::-webkit-calendar-picker-indicator {
+  position: absolute;
+  right: 10px;
+  opacity: 0.45;
+}
+
+.time-field input,
+.break-field input {
+  min-height: 48px;
+}
+
+.base-rate-field {
+  margin-top: 18px;
+}
+
+.base-rate-field input {
+  min-height: 50px;
+  font-weight: 450;
+}
+
+.time-field input:focus,
+.break-field input:focus,
+.base-rate-field input:focus {
+  border-color: rgba(23, 25, 28, 0.24);
+  background: var(--surface-strong);
+  box-shadow: 0 0 0 4px rgba(23, 25, 28, 0.06);
+}
+
 .save-button {
   width: 100%;
   min-height: 56px;
@@ -579,7 +718,7 @@ h1 {
   border: 0;
   border-radius: 16px;
   color: #ffffff;
-  font-weight: 700;
+  font-weight: 550;
   background: var(--button);
   box-shadow: 0 12px 24px rgba(23, 25, 28, 0.2);
   cursor: pointer;
@@ -603,7 +742,7 @@ h1 {
   border: 1px solid var(--border);
   border-radius: 15px;
   color: var(--text-muted);
-  font-weight: 650;
+  font-weight: 450;
   background: rgba(255, 255, 255, 0.72);
   cursor: pointer;
 }
@@ -651,7 +790,7 @@ h1 {
   padding: 0 14px;
   border-radius: 999px;
   font-size: 0.86rem;
-  font-weight: 650;
+  font-weight: 500;
 }
 
 .save-message--text .save-message__icon {
@@ -663,32 +802,37 @@ h1 {
   transform: translateY(0);
 }
 
-.month-picker-card {
-  margin-bottom: 20px;
-  padding: 10px 12px;
-}
-
 .history-month-control {
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) 40px;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
   align-items: center;
   gap: 8px;
 }
 
 .history-month-control__value {
+  display: flex;
+  min-height: 54px;
+  padding: 0 15px;
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-main);
   font-size: 1rem;
-  font-weight: 680;
+  font-weight: 500;
   text-align: center;
+  background: rgba(255, 255, 255, 0.8);
 }
 
 .history-month-arrow {
-  display: grid;
-  width: 40px;
-  height: 40px;
+  display: flex;
+  width: 100%;
+  min-height: 44px;
   padding: 0;
   border: 1px solid var(--border);
   border-radius: 14px;
-  place-items: center;
+  align-items: center;
+  justify-content: center;
   color: var(--text-main);
   background: rgba(255, 255, 255, 0.82);
   cursor: pointer;
@@ -726,7 +870,7 @@ h1 {
   color: var(--text-muted);
   font: inherit;
   font-size: 0.78rem;
-  font-weight: 650;
+  font-weight: 450;
   background: rgba(255, 255, 255, 0.6);
   cursor: pointer;
   transition:
@@ -780,12 +924,12 @@ h1 {
 .shift-card {
   width: 100%;
   padding: 18px;
-  border: 1px solid rgba(31, 35, 40, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.65);
   border-radius: var(--radius-medium);
   color: var(--text-main);
   font: inherit;
   text-align: left;
-  background: #f8f9fa;
+  background: var(--surface);
   cursor: pointer;
   transition: transform 160ms ease;
 }
@@ -802,7 +946,7 @@ h1 {
 .shift-card__date {
   margin: 0 0 14px;
   font-size: 1.04rem;
-  font-weight: 750;
+  font-weight: 550;
   letter-spacing: -0.02em;
 }
 
@@ -887,7 +1031,7 @@ body.profile-page-active .bottom-navigation {
   gap: 8px;
   color: #787d84;
   font-size: 0.82rem;
-  font-weight: 680;
+  font-weight: 500;
   background: rgba(247, 248, 249, 0.92);
   box-shadow: 0 10px 28px rgba(20, 25, 31, 0.12);
   backdrop-filter: blur(18px);
@@ -998,7 +1142,7 @@ body.profile-page-active .bottom-navigation {
   margin: 0 0 6px;
   color: var(--text-muted);
   font-size: 0.75rem;
-  font-weight: 700;
+  font-weight: 500;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -1074,7 +1218,7 @@ body.profile-page-active .bottom-navigation {
 
 .salary-estimate-total span {
   font-size: 0.76rem;
-  font-weight: 650;
+  font-weight: 450;
   opacity: 0.7;
 }
 
@@ -1122,7 +1266,7 @@ body.profile-page-active .bottom-navigation {
 .time-picker-dialog__header h2 {
   margin: 0;
   font-size: 1.05rem;
-  font-weight: 750;
+  font-weight: 550;
 }
 
 .time-stepper {
@@ -1143,7 +1287,7 @@ body.profile-page-active .bottom-navigation {
 .time-stepper__label {
   color: var(--text-muted);
   font-size: 0.72rem;
-  font-weight: 700;
+  font-weight: 450;
   text-align: center;
 }
 
@@ -1186,14 +1330,14 @@ body.profile-page-active .bottom-navigation {
   place-items: center;
   color: var(--text-main);
   font-size: 1.8rem;
-  font-weight: 760;
+  font-weight: 500;
   background: rgba(230, 233, 237, 0.72);
 }
 
 .time-stepper__separator {
   margin-top: 28px;
   font-size: 1.8rem;
-  font-weight: 750;
+  font-weight: 500;
   text-align: center;
 }
 
@@ -1204,7 +1348,7 @@ body.profile-page-active .bottom-navigation {
   border: 0;
   border-radius: 15px;
   color: #ffffff;
-  font-weight: 700;
+  font-weight: 550;
   background: var(--button);
   cursor: pointer;
 }
@@ -1230,7 +1374,7 @@ body.profile-page-active .bottom-navigation {
   margin: 0 0 6px;
   color: var(--text-muted);
   font-size: 0.75rem;
-  font-weight: 700;
+  font-weight: 500;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -1260,7 +1404,7 @@ body.profile-page-active .bottom-navigation {
   min-height: 52px;
   border: 0;
   border-radius: 15px;
-  font-weight: 700;
+  font-weight: 550;
   cursor: pointer;
 }
 
@@ -1316,7 +1460,7 @@ body.profile-page-active .bottom-navigation {
 .date-picker__title {
   margin: 0;
   font-size: 1.05rem;
-  font-weight: 750;
+  font-weight: 550;
   text-align: center;
   text-transform: capitalize;
 }
@@ -1362,7 +1506,7 @@ body.profile-page-active .bottom-navigation {
   margin: 20px 0 8px;
   color: var(--text-muted);
   font-size: 0.7rem;
-  font-weight: 700;
+  font-weight: 450;
   text-align: center;
 }
 
@@ -1397,7 +1541,7 @@ body.profile-page-active .bottom-navigation {
 
 .calendar-day--selected {
   color: #ffffff;
-  font-weight: 750;
+  font-weight: 500;
   background: var(--button);
   box-shadow: 0 8px 18px rgba(23, 25, 28, 0.2);
 }
@@ -1413,7 +1557,7 @@ body.profile-page-active .bottom-navigation {
   border: 0;
   border-radius: 15px;
   color: #ffffff;
-  font-weight: 700;
+  font-weight: 550;
   background: var(--button);
   cursor: pointer;
 }
