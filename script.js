@@ -73,7 +73,6 @@ const increaseBreakButton = document.querySelector("#increaseBreakButton");
 const decreaseBreakButton = document.querySelector("#decreaseBreakButton");
 const confirmBreakButton = document.querySelector("#confirmBreakButton");
 const saveButton = document.querySelector("#saveButton");
-const cancelEditButton = document.querySelector("#cancelEditButton");
 const saveMessage = document.querySelector("#saveMessage");
 const saveMessageText = document.querySelector("#saveMessageText");
 const monthSelect = document.querySelector("#monthSelect");
@@ -190,15 +189,9 @@ function inputValueToDate(dateValue) {
 
 // Показывает выбранную дату в понятном русском формате.
 function updateSelectedDateText() {
-  const selectedDate = inputValueToDate(shiftDateInput.value);
-
-  selectedDateText.textContent = new Intl.DateTimeFormat("ru-RU", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  })
-    .format(selectedDate)
-    .replace(/\s*г\.$/, "");
+  selectedDateText.textContent = `${formatShiftDate(
+    shiftDateInput.value,
+  )} ${formatShortWeekday(shiftDateInput.value)}`;
 }
 
 // Меняет дату на главной на нужное количество дней.
@@ -208,7 +201,7 @@ function changeShiftDateByDays(dayOffset) {
 
   currentDate.setDate(currentDate.getDate() + dayOffset);
   shiftDateInput.value = dateToInputValue(currentDate);
-  updateSelectedDateText();
+  handleSelectedDateChange();
 }
 
 // Рисует дни открытого месяца. Добавляются также соседние дни для полной сетки.
@@ -271,7 +264,7 @@ function renderDatePicker() {
         dayDate.getMonth(),
         1,
       );
-      updateSelectedDateText();
+      handleSelectedDateChange();
       closeDatePicker();
     });
 
@@ -436,6 +429,11 @@ function getSavedShifts() {
   }
 }
 
+// Находит сохранённую смену по выбранной дате.
+function getShiftByDate(dateValue) {
+  return getSavedShifts().find((shift) => shift.date === dateValue) || null;
+}
+
 // Полностью обновляет список смен в localStorage.
 function saveShifts(shifts) {
   localStorage.setItem(getActiveStorageKey(), JSON.stringify(shifts));
@@ -463,6 +461,17 @@ function formatMonthName(monthKey) {
 // Преобразует дату из YYYY-MM-DD в требуемый вид YYYY/MM/DD.
 function formatShiftDate(dateValue) {
   return dateValue.replaceAll("-", "/");
+}
+
+// Показывает короткий день недели для карточки смены.
+function formatShortWeekday(dateValue) {
+  const weekday = new Intl.DateTimeFormat("ru-RU", {
+    weekday: "short",
+  })
+    .format(inputValueToDate(dateValue))
+    .replace(".", "");
+
+  return weekday.charAt(0).toUpperCase() + weekday.slice(1);
 }
 
 // Переводит время HH:MM в количество минут от начала суток.
@@ -549,6 +558,52 @@ function setBreakValue(fieldName, minutes) {
 
   input.value = String(safeMinutes);
   text.textContent = formatBreakDisplay(safeMinutes);
+}
+
+// Восстанавливает последние сохранённые значения времени и перерывов.
+function restoreLastShiftValues() {
+  try {
+    const lastTime = JSON.parse(localStorage.getItem(LAST_TIME_KEY));
+
+    if (!lastTime) {
+      return false;
+    }
+
+    setTimeValue("start", lastTime.startTime || "");
+    setTimeValue("end", lastTime.endTime || "");
+    setBreakValue("lunch", lastTime.lunchBreakMinutes || 0);
+    setBreakValue("dinner", lastTime.dinnerBreakMinutes || 0);
+
+    return true;
+  } catch (error) {
+    console.error("Не удалось восстановить последнее время смены:", error);
+    return false;
+  }
+}
+
+// Проверяет выбранную дату на главной и подставляет сохранённую смену, если она есть.
+function applyShiftForSelectedDate() {
+  const savedShift = getShiftByDate(shiftDateInput.value);
+
+  if (!savedShift) {
+    finishEditing();
+    restoreLastShiftValues();
+    return;
+  }
+
+  editingShiftId = savedShift.id;
+  editingOriginalDate = savedShift.date;
+  setTimeValue("start", savedShift.startTime);
+  setTimeValue("end", savedShift.endTime);
+  setBreakValue("lunch", savedShift.lunchBreakMinutes || 0);
+  setBreakValue("dinner", savedShift.dinnerBreakMinutes || 0);
+  saveButton.textContent = "Сохранить изменения";
+}
+
+// Общее действие после смены даты: обновить текст и проверить сохранённую смену.
+function handleSelectedDateChange() {
+  updateSelectedDateText();
+  applyShiftForSelectedDate();
 }
 
 function getShiftBreakMinutes(shift) {
@@ -847,7 +902,6 @@ function finishEditing() {
   editingShiftId = null;
   editingOriginalDate = null;
   saveButton.textContent = "Сохранить";
-  cancelEditButton.hidden = true;
 }
 
 // Создаёт одну карточку смены без вставки HTML-строк из localStorage.
@@ -870,10 +924,18 @@ function createShiftCard(shift) {
 // Создаёт одинаковое содержимое смены для списка и всплывающего окна.
 function createShiftDetails(shift) {
   const wrapper = document.createElement("div");
+  const dateLine = document.createElement("div");
+  dateLine.className = "shift-card__date-line";
 
   const date = document.createElement("h2");
   date.className = "shift-card__date";
   date.textContent = formatShiftDate(shift.date);
+
+  const weekday = document.createElement("span");
+  weekday.className = "shift-card__weekday";
+  weekday.textContent = formatShortWeekday(shift.date);
+
+  dateLine.append(date, weekday);
 
   const details = document.createElement("div");
   details.className = "shift-card__details";
@@ -890,7 +952,7 @@ function createShiftDetails(shift) {
     );
   }
 
-  wrapper.append(date, details);
+  wrapper.append(dateLine, details);
   return wrapper;
 }
 
@@ -1059,6 +1121,7 @@ function updateAccountView(user) {
 function refreshShiftInterface(preferredMonth) {
   renderMonthOptions(preferredMonth);
   renderShifts();
+  handleSelectedDateChange();
 }
 
 async function synchronizeUserShifts(user) {
@@ -1334,7 +1397,6 @@ editShiftButton.addEventListener("click", () => {
   setBreakValue("dinner", shift.dinnerBreakMinutes || 0);
   updateSelectedDateText();
   saveButton.textContent = "Сохранить изменения";
-  cancelEditButton.hidden = false;
 
   closeShiftActions(false);
   showPage("homePage");
@@ -1363,12 +1425,6 @@ deleteShiftButton.addEventListener("click", async () => {
       console.error("Не удалось удалить смену из облака:", error);
     }
   }
-});
-
-cancelEditButton.addEventListener("click", () => {
-  finishEditing();
-  shiftDateInput.value = getTodayValue();
-  updateSelectedDateText();
 });
 
 startTimeButton.addEventListener("click", () => openTimePicker("start"));
@@ -1443,7 +1499,7 @@ nextMonthButton.addEventListener("click", () => {
 
 todayButton.addEventListener("click", () => {
   shiftDateInput.value = getTodayValue();
-  updateSelectedDateText();
+  handleSelectedDateChange();
   closeDatePicker();
 });
 
@@ -1471,21 +1527,8 @@ document.addEventListener("keydown", (event) => {
 
 // Начальные значения при первом открытии приложения.
 shiftDateInput.value = getTodayValue();
-updateSelectedDateText();
-
-// Восстанавливаем время, которое пользователь сохранял в прошлый раз.
-try {
-  const lastTime = JSON.parse(localStorage.getItem(LAST_TIME_KEY));
-
-  if (lastTime) {
-    setTimeValue("start", lastTime.startTime || "");
-    setTimeValue("end", lastTime.endTime || "");
-    setBreakValue("lunch", lastTime.lunchBreakMinutes || 0);
-    setBreakValue("dinner", lastTime.dinnerBreakMinutes || 0);
-  }
-} catch (error) {
-  console.error("Не удалось восстановить последнее время смены:", error);
-}
+restoreLastShiftValues();
+handleSelectedDateChange();
 
 baseRateInput.value = String(getBaseRate());
 

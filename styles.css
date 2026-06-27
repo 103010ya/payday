@@ -689,21 +689,6 @@ h1 {
   transform: scale(0.985);
 }
 
-.cancel-edit-button {
-  width: 100%;
-  min-height: 48px;
-  margin-top: 10px;
-  border: 1px solid var(--border);
-  border-radius: 15px;
-  color: var(--text-muted);
-  background: var(--app-block-background);
-  cursor: pointer;
-}
-
-.cancel-edit-button[hidden] {
-  display: none;
-}
-
 .save-message {
   display: grid;
   width: 46px;
@@ -865,10 +850,23 @@ h1 {
   outline-offset: 2px;
 }
 
+.shift-card__date-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
 .shift-card__date {
-  margin: 0 0 14px;
+  margin: 0;
   font-size: 1.04rem;
   letter-spacing: -0.02em;
+}
+
+.shift-card__weekday {
+  color: var(--text-muted);
+  font-size: 0.78rem;
 }
 
 .shift-card__details {
