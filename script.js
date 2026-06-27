@@ -96,6 +96,7 @@ const baseRateInput = document.querySelector("#baseRateInput");
 const salaryTotalHours = document.querySelector("#salaryTotalHours");
 const salaryBreakdown = document.querySelector("#salaryBreakdown");
 const salaryTotalAmount = document.querySelector("#salaryTotalAmount");
+const historyScrollArea = document.querySelector(".history-scroll-area");
 const shiftList = document.querySelector("#shiftList");
 const emptyState = document.querySelector("#emptyState");
 const shiftCount = document.querySelector("#shiftCount");
@@ -797,12 +798,14 @@ function openSalaryEstimate() {
   renderSalaryEstimate();
   salaryEstimateOverlay.hidden = false;
   document.body.classList.add("dialog-open");
-  baseRateInput.focus();
 }
 
 function closeSalaryEstimate() {
   salaryEstimateOverlay.hidden = true;
   document.body.classList.remove("dialog-open");
+  document.activeElement?.blur();
+  window.scrollTo(0, 0);
+  historyScrollArea.scrollTop = 0;
   shiftCount.focus();
 }
 

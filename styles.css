@@ -431,10 +431,10 @@ body.profile-page-active .app-content {
   width: 100%;
   min-height: 52px;
   margin-top: 15px;
-  border: 1px solid var(--border);
+  border: 0;
   border-radius: 15px;
-  color: #9a4141;
-  background: var(--app-block-background);
+  color: #ffffff;
+  background: var(--button);
   cursor: pointer;
 }
 
