@@ -51,11 +51,15 @@ const startTimeInput = document.querySelector("#startTime");
 const endTimeInput = document.querySelector("#endTime");
 const lunchBreakInput = document.querySelector("#lunchBreak");
 const dinnerBreakInput = document.querySelector("#dinnerBreak");
+const lunchBreakButton = document.querySelector("#lunchBreakButton");
+const dinnerBreakButton = document.querySelector("#dinnerBreakButton");
+const lunchBreakText = document.querySelector("#lunchBreakText");
+const dinnerBreakText = document.querySelector("#dinnerBreakText");
+const startTimeButton = document.querySelector("#startTimeButton");
+const endTimeButton = document.querySelector("#endTimeButton");
+const startTimeText = document.querySelector("#startTimeText");
+const endTimeText = document.querySelector("#endTimeText");
 const timePickerOverlay = document.querySelector("#timePickerOverlay");
-const timePickerTitle = document.querySelector("#timePickerTitle");
-const closeTimePickerButton = document.querySelector(
-  "#closeTimePickerButton",
-);
 const hourValue = document.querySelector("#hourValue");
 const minuteValue = document.querySelector("#minuteValue");
 const increaseHourButton = document.querySelector("#increaseHourButton");
@@ -63,6 +67,11 @@ const decreaseHourButton = document.querySelector("#decreaseHourButton");
 const increaseMinuteButton = document.querySelector("#increaseMinuteButton");
 const decreaseMinuteButton = document.querySelector("#decreaseMinuteButton");
 const confirmTimeButton = document.querySelector("#confirmTimeButton");
+const breakPickerOverlay = document.querySelector("#breakPickerOverlay");
+const breakValue = document.querySelector("#breakValue");
+const increaseBreakButton = document.querySelector("#increaseBreakButton");
+const decreaseBreakButton = document.querySelector("#decreaseBreakButton");
+const confirmBreakButton = document.querySelector("#confirmBreakButton");
 const saveButton = document.querySelector("#saveButton");
 const cancelEditButton = document.querySelector("#cancelEditButton");
 const saveMessage = document.querySelector("#saveMessage");
@@ -76,18 +85,11 @@ const nextHistoryMonthButton = document.querySelector(
   "#nextHistoryMonthButton",
 );
 const shiftActionsOverlay = document.querySelector("#shiftActionsOverlay");
-const shiftActionsTitle = document.querySelector("#shiftActionsTitle");
-const shiftActionsTime = document.querySelector("#shiftActionsTime");
-const closeShiftActionsButton = document.querySelector(
-  "#closeShiftActionsButton",
-);
+const shiftActionsDetails = document.querySelector("#shiftActionsDetails");
 const editShiftButton = document.querySelector("#editShiftButton");
 const deleteShiftButton = document.querySelector("#deleteShiftButton");
 const salaryEstimateOverlay = document.querySelector(
   "#salaryEstimateOverlay",
-);
-const closeSalaryEstimateButton = document.querySelector(
-  "#closeSalaryEstimateButton",
 );
 const salaryEstimateMonth = document.querySelector("#salaryEstimateMonth");
 const baseRateInput = document.querySelector("#baseRateInput");
@@ -99,11 +101,6 @@ const emptyState = document.querySelector("#emptyState");
 const shiftCount = document.querySelector("#shiftCount");
 const navigationButtons = document.querySelectorAll(".nav-button");
 const pages = document.querySelectorAll(".page");
-const pageOrder = {
-  homePage: 0,
-  calendarPage: 1,
-  profilePage: 2,
-};
 
 let messageTimer;
 let activePageId = "homePage";
@@ -113,14 +110,12 @@ let selectedShiftId = null;
 let editingShiftId = null;
 let editingOriginalDate = null;
 let activeTimeField = null;
+let activeBreakField = null;
 let selectedHour = 0;
 let selectedMinute = 0;
+let selectedBreakMinutes = 0;
 let availableMonthKeys = [];
 let selectedMonthIndex = 0;
-let swipeStartX = 0;
-let swipeStartY = 0;
-let swipeTracking = false;
-let keyboardFocusTimer;
 
 // Категории оплаты. Сумма считается как «основная ставка × коэффициент».
 const PAY_CATEGORIES = {
@@ -203,6 +198,16 @@ function updateSelectedDateText() {
   })
     .format(selectedDate)
     .replace(/\s*г\.$/, "");
+}
+
+// Меняет дату на главной на нужное количество дней.
+// Например: -1 — предыдущий день, 1 — следующий день.
+function changeShiftDateByDays(dayOffset) {
+  const currentDate = inputValueToDate(shiftDateInput.value || getTodayValue());
+
+  currentDate.setDate(currentDate.getDate() + dayOffset);
+  shiftDateInput.value = dateToInputValue(currentDate);
+  updateSelectedDateText();
 }
 
 // Рисует дни открытого месяца. Добавляются также соседние дни для полной сетки.
@@ -296,26 +301,14 @@ function closeDatePicker() {
   datePickerButton.focus();
 }
 
-// Быстро меняет дату смены стрелками на главной.
-function changeShiftDateByDays(dayStep) {
-  const selectedDate = inputValueToDate(shiftDateInput.value);
-
-  selectedDate.setDate(selectedDate.getDate() + dayStep);
-  shiftDateInput.value = dateToInputValue(selectedDate);
-  visibleCalendarMonth = new Date(
-    selectedDate.getFullYear(),
-    selectedDate.getMonth(),
-    1,
-  );
-  updateSelectedDateText();
-}
-
-// Записывает время в поле начала или конца смены.
+// Записывает время в скрытое поле и обновляет текст видимой кнопки.
 function setTimeValue(fieldName, timeValue) {
   const isStartTime = fieldName === "start";
   const input = isStartTime ? startTimeInput : endTimeInput;
+  const text = isStartTime ? startTimeText : endTimeText;
 
   input.value = timeValue;
+  text.textContent = timeValue || "--:--";
 }
 
 // Обновляет крупные значения часов и минут во всплывающем окне.
@@ -345,24 +338,75 @@ function openTimePicker(fieldName) {
 
   selectedHour = hour;
   selectedMinute = minute;
-  timePickerTitle.textContent =
-    fieldName === "start" ? "Начало смены" : "Конец смены";
   timePickerOverlay.hidden = false;
   document.body.classList.add("dialog-open");
 
+  const activeButton =
+    fieldName === "start" ? startTimeButton : endTimeButton;
+  activeButton.setAttribute("aria-expanded", "true");
+
   renderTimeStepper();
 
-  closeTimePickerButton.focus();
+  increaseHourButton.focus();
 }
 
 function closeTimePicker(restoreFocus = true) {
   timePickerOverlay.hidden = true;
   document.body.classList.remove("dialog-open");
 
+  const activeButton =
+    activeTimeField === "start" ? startTimeButton : endTimeButton;
+  activeButton?.setAttribute("aria-expanded", "false");
+
   if (restoreFocus) {
-    const activeInput =
-      activeTimeField === "start" ? startTimeInput : endTimeInput;
-    activeInput?.focus();
+    activeButton?.focus();
+  }
+}
+
+function renderBreakStepper() {
+  breakValue.textContent = String(selectedBreakMinutes);
+}
+
+function changeBreakMinutes(direction) {
+  const maxBreakMinutes = 240;
+  const stepMinutes = 10;
+  selectedBreakMinutes =
+    (selectedBreakMinutes +
+      direction * stepMinutes +
+      maxBreakMinutes +
+      stepMinutes) %
+    (maxBreakMinutes + stepMinutes);
+
+  renderBreakStepper();
+}
+
+function openBreakPicker(fieldName) {
+  activeBreakField = fieldName;
+  const currentValue =
+    fieldName === "lunch" ? lunchBreakInput.value : dinnerBreakInput.value;
+
+  selectedBreakMinutes = breakValueToMinutes(currentValue) || 0;
+  breakPickerOverlay.hidden = false;
+  document.body.classList.add("dialog-open");
+
+  const activeButton =
+    fieldName === "lunch" ? lunchBreakButton : dinnerBreakButton;
+  activeButton.setAttribute("aria-expanded", "true");
+
+  renderBreakStepper();
+  increaseBreakButton.focus();
+}
+
+function closeBreakPicker(restoreFocus = true) {
+  breakPickerOverlay.hidden = true;
+  document.body.classList.remove("dialog-open");
+
+  const activeButton =
+    activeBreakField === "lunch" ? lunchBreakButton : dinnerBreakButton;
+  activeButton?.setAttribute("aria-expanded", "false");
+
+  if (restoreFocus) {
+    activeButton?.focus();
   }
 }
 
@@ -491,13 +535,19 @@ function breakValueToMinutes(value) {
   return parsedMinutes;
 }
 
-// Приводит минуты перерыва к виду HH:MM для сохранения и повторного показа.
-function formatBreakValue(totalMinutes) {
+function formatBreakDisplay(totalMinutes) {
   const safeMinutes = Math.max(0, Number(totalMinutes) || 0);
-  const hours = Math.floor(safeMinutes / 60);
-  const minutes = safeMinutes % 60;
 
-  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+  return `${safeMinutes} мин`;
+}
+
+function setBreakValue(fieldName, minutes) {
+  const safeMinutes = Math.max(0, Number(minutes) || 0);
+  const input = fieldName === "lunch" ? lunchBreakInput : dinnerBreakInput;
+  const text = fieldName === "lunch" ? lunchBreakText : dinnerBreakText;
+
+  input.value = String(safeMinutes);
+  text.textContent = formatBreakDisplay(safeMinutes);
 }
 
 function getShiftBreakMinutes(shift) {
@@ -747,7 +797,7 @@ function openSalaryEstimate() {
   renderSalaryEstimate();
   salaryEstimateOverlay.hidden = false;
   document.body.classList.add("dialog-open");
-  closeSalaryEstimateButton.focus();
+  baseRateInput.focus();
 }
 
 function closeSalaryEstimate() {
@@ -759,11 +809,10 @@ function closeSalaryEstimate() {
 // Открывает меню действий для смены, на которую нажал пользователь.
 function openShiftActions(shift) {
   selectedShiftId = shift.id;
-  shiftActionsTitle.textContent = formatShiftDate(shift.date);
-  shiftActionsTime.textContent = `${shift.startTime} — ${shift.endTime}`;
+  shiftActionsDetails.replaceChildren(createShiftDetails(shift));
   shiftActionsOverlay.hidden = false;
   document.body.classList.add("dialog-open");
-  closeShiftActionsButton.focus();
+  editShiftButton.focus();
 }
 
 function closeShiftActions(restoreFocus = true) {
@@ -796,6 +845,16 @@ function createShiftCard(shift) {
     `Смена ${formatShiftDate(shift.date)}, с ${shift.startTime} до ${shift.endTime}`,
   );
 
+  card.append(createShiftDetails(shift));
+  card.addEventListener("click", () => openShiftActions(shift));
+
+  return card;
+}
+
+// Создаёт одинаковое содержимое смены для списка и всплывающего окна.
+function createShiftDetails(shift) {
+  const wrapper = document.createElement("div");
+
   const date = document.createElement("h2");
   date.className = "shift-card__date";
   date.textContent = formatShiftDate(shift.date);
@@ -815,10 +874,8 @@ function createShiftCard(shift) {
     );
   }
 
-  card.append(date, details);
-  card.addEventListener("click", () => openShiftActions(shift));
-
-  return card;
+  wrapper.append(date, details);
+  return wrapper;
 }
 
 // Вспомогательная функция для строки «название — время».
@@ -871,47 +928,11 @@ function showSavedMessage(message = "") {
   }, 2200);
 }
 
-function isEditableField(element) {
-  return (
-    element instanceof HTMLInputElement &&
-    element.type !== "hidden" &&
-    !element.readOnly &&
-    !element.disabled
-  );
-}
-
-// На телефоне клавиатура уменьшает видимую область. Подводим активное поле так,
-// чтобы пользователь видел, что вводит.
-function scrollFocusedFieldIntoView(field) {
-  window.clearTimeout(keyboardFocusTimer);
-
-  keyboardFocusTimer = window.setTimeout(() => {
-    field.scrollIntoView({
-      behavior: "smooth",
-      block: "center",
-      inline: "nearest",
-    });
-  }, 260);
-}
-
-function openKeyboardMode(field) {
-  document.body.classList.add("keyboard-open");
-  scrollFocusedFieldIntoView(field);
-}
-
-function closeKeyboardModeIfNeeded() {
-  window.clearTimeout(keyboardFocusTimer);
-
-  keyboardFocusTimer = window.setTimeout(() => {
-    if (!isEditableField(document.activeElement)) {
-      document.body.classList.remove("keyboard-open");
-    }
-  }, 120);
-}
-
 // Переключает видимый раздел и выделяет активную кнопку внизу.
 function showPage(pageId) {
-  if (!(pageId in pageOrder)) {
+  const targetPage = document.getElementById(pageId);
+
+  if (!targetPage) {
     return;
   }
 
@@ -935,15 +956,10 @@ function showPage(pageId) {
     renderShifts();
   }
 
-  const activePageIndex = pageOrder[pageId];
-
   pages.forEach((page) => {
     const isActive = page.id === pageId;
-    const pageIndex = pageOrder[page.id];
 
     page.classList.toggle("page--active", isActive);
-    page.classList.toggle("page--left", !isActive && pageIndex < activePageIndex);
-    page.classList.toggle("page--right", !isActive && pageIndex > activePageIndex);
     page.setAttribute("aria-hidden", String(!isActive));
     page.inert = !isActive;
   });
@@ -1099,7 +1115,7 @@ shiftForm.addEventListener("submit", async (event) => {
   const dinnerBreakMinutes = breakValueToMinutes(dinnerBreakInput.value);
 
   if (lunchBreakMinutes === null || dinnerBreakMinutes === null) {
-    showSavedMessage("Перерыв укажите в формате 01:00");
+    showSavedMessage("Выберите перерыв заново");
     return;
   }
 
@@ -1258,67 +1274,6 @@ logoutButton.addEventListener("click", async () => {
   }
 });
 
-// Переключение разделов горизонтальным свайпом.
-document.querySelector(".app-content").addEventListener(
-  "touchstart",
-  (event) => {
-    if (document.body.classList.contains("dialog-open")) {
-      return;
-    }
-
-    const touch = event.changedTouches[0];
-    swipeStartX = touch.clientX;
-    swipeStartY = touch.clientY;
-    swipeTracking = true;
-  },
-  { passive: true },
-);
-
-document.querySelector(".app-content").addEventListener(
-  "touchend",
-  (event) => {
-    if (!swipeTracking) {
-      return;
-    }
-
-    swipeTracking = false;
-    const touch = event.changedTouches[0];
-    const horizontalDistance = touch.clientX - swipeStartX;
-    const verticalDistance = touch.clientY - swipeStartY;
-    const isHorizontalSwipe =
-      Math.abs(horizontalDistance) >= 60 &&
-      Math.abs(horizontalDistance) > Math.abs(verticalDistance) * 1.35;
-
-    if (!isHorizontalSwipe) {
-      return;
-    }
-
-    if (horizontalDistance < 0 && activePageId === "homePage") {
-      showPage("calendarPage");
-    } else if (horizontalDistance > 0 && activePageId !== "homePage") {
-      showPage("homePage");
-    }
-  },
-  { passive: true },
-);
-
-document.addEventListener("focusin", (event) => {
-  if (isEditableField(event.target)) {
-    openKeyboardMode(event.target);
-  }
-});
-
-document.addEventListener("focusout", closeKeyboardModeIfNeeded);
-
-window.visualViewport?.addEventListener("resize", () => {
-  if (
-    document.body.classList.contains("keyboard-open") &&
-    isEditableField(document.activeElement)
-  ) {
-    scrollFocusedFieldIntoView(document.activeElement);
-  }
-});
-
 previousHistoryMonthButton.addEventListener("click", () => {
   changeHistoryMonth(1);
 });
@@ -1328,7 +1283,6 @@ nextHistoryMonthButton.addEventListener("click", () => {
 });
 
 shiftCount.addEventListener("click", openSalaryEstimate);
-closeSalaryEstimateButton.addEventListener("click", closeSalaryEstimate);
 
 baseRateInput.addEventListener("change", () => {
   setBaseRate(baseRateInput.value);
@@ -1340,8 +1294,6 @@ salaryEstimateOverlay.addEventListener("click", (event) => {
     closeSalaryEstimate();
   }
 });
-
-closeShiftActionsButton.addEventListener("click", () => closeShiftActions());
 
 shiftActionsOverlay.addEventListener("click", (event) => {
   if (event.target === shiftActionsOverlay) {
@@ -1362,8 +1314,8 @@ editShiftButton.addEventListener("click", () => {
   shiftDateInput.value = shift.date;
   setTimeValue("start", shift.startTime);
   setTimeValue("end", shift.endTime);
-  lunchBreakInput.value = formatBreakValue(shift.lunchBreakMinutes || 0);
-  dinnerBreakInput.value = formatBreakValue(shift.dinnerBreakMinutes || 0);
+  setBreakValue("lunch", shift.lunchBreakMinutes || 0);
+  setBreakValue("dinner", shift.dinnerBreakMinutes || 0);
   updateSelectedDateText();
   saveButton.textContent = "Сохранить изменения";
   cancelEditButton.hidden = false;
@@ -1403,19 +1355,20 @@ cancelEditButton.addEventListener("click", () => {
   updateSelectedDateText();
 });
 
-previousShiftDateButton.addEventListener("click", () => {
-  changeShiftDateByDays(-1);
-});
-
-nextShiftDateButton.addEventListener("click", () => {
-  changeShiftDateByDays(1);
-});
-
-closeTimePickerButton.addEventListener("click", () => closeTimePicker());
+startTimeButton.addEventListener("click", () => openTimePicker("start"));
+endTimeButton.addEventListener("click", () => openTimePicker("end"));
+lunchBreakButton.addEventListener("click", () => openBreakPicker("lunch"));
+dinnerBreakButton.addEventListener("click", () => openBreakPicker("dinner"));
 
 timePickerOverlay.addEventListener("click", (event) => {
   if (event.target === timePickerOverlay) {
     closeTimePicker();
+  }
+});
+
+breakPickerOverlay.addEventListener("click", (event) => {
+  if (event.target === breakPickerOverlay) {
+    closeBreakPicker();
   }
 });
 
@@ -1427,6 +1380,8 @@ increaseMinuteButton.addEventListener("click", () =>
 decreaseMinuteButton.addEventListener("click", () =>
   changeTimePart("minute", -1),
 );
+increaseBreakButton.addEventListener("click", () => changeBreakMinutes(1));
+decreaseBreakButton.addEventListener("click", () => changeBreakMinutes(-1));
 
 confirmTimeButton.addEventListener("click", () => {
   const timeValue = `${String(selectedHour).padStart(2, "0")}:${String(
@@ -1437,7 +1392,20 @@ confirmTimeButton.addEventListener("click", () => {
   closeTimePicker();
 });
 
+confirmBreakButton.addEventListener("click", () => {
+  setBreakValue(activeBreakField, selectedBreakMinutes);
+  closeBreakPicker();
+});
+
 datePickerButton.addEventListener("click", openDatePicker);
+
+previousShiftDateButton.addEventListener("click", () => {
+  changeShiftDateByDays(-1);
+});
+
+nextShiftDateButton.addEventListener("click", () => {
+  changeShiftDateByDays(1);
+});
 
 previousMonthButton.addEventListener("click", () => {
   visibleCalendarMonth = new Date(
@@ -1479,6 +1447,8 @@ document.addEventListener("keydown", (event) => {
       closeShiftActions();
     } else if (!timePickerOverlay.hidden) {
       closeTimePicker();
+    } else if (!breakPickerOverlay.hidden) {
+      closeBreakPicker();
     }
   }
 });
@@ -1494,8 +1464,8 @@ try {
   if (lastTime) {
     setTimeValue("start", lastTime.startTime || "");
     setTimeValue("end", lastTime.endTime || "");
-    lunchBreakInput.value = formatBreakValue(lastTime.lunchBreakMinutes || 0);
-    dinnerBreakInput.value = formatBreakValue(lastTime.dinnerBreakMinutes || 0);
+    setBreakValue("lunch", lastTime.lunchBreakMinutes || 0);
+    setBreakValue("dinner", lastTime.dinnerBreakMinutes || 0);
   }
 } catch (error) {
   console.error("Не удалось восстановить последнее время смены:", error);
