@@ -13,7 +13,7 @@
       content="Мобильное приложение для учёта рабочих смен"
     />
     <title>Учёт смен</title>
-    <link rel="stylesheet" href="styles.css?v=20260628-1" />
+    <link rel="stylesheet" href="styles.css?v=20260628-2" />
   </head>
 
   <body class="home-page-active">
@@ -190,14 +190,27 @@
             <div class="calendar-heading__title">
               <h1 id="historyTitle">История</h1>
             </div>
-            <button
-              id="shiftCount"
-              class="shift-count"
-              type="button"
-              aria-label="Открыть расчёт примерной выплаты"
-            >
-              0
-            </button>
+            <div class="history-actions">
+              <button
+                id="shiftCount"
+                class="shift-count"
+                type="button"
+                aria-label="Открыть расчёт примерной выплаты"
+              >
+                0
+              </button>
+              <button
+                id="paySettingsButton"
+                class="history-settings-button"
+                type="button"
+                aria-label="Открыть настройки расчёта"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 8.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7Z" />
+                  <path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a1.9 1.9 0 0 1-2.7 2.7l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a1.9 1.9 0 0 1-3.8 0v-.2a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a1.9 1.9 0 0 1-2.7-2.7l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a1.9 1.9 0 0 1 0-3.8h.2a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a1.9 1.9 0 0 1 2.7-2.7l.1.1a1.6 1.6 0 0 0 1.8.3h.1a1.6 1.6 0 0 0 1-1.5V3a1.9 1.9 0 0 1 3.8 0v.2a1.6 1.6 0 0 0 1 1.5h.1a1.6 1.6 0 0 0 1.8-.3l.1-.1a1.9 1.9 0 0 1 2.7 2.7l-.1.1a1.6 1.6 0 0 0-.3 1.8v.1a1.6 1.6 0 0 0 1.5 1h.2a1.9 1.9 0 0 1 0 3.8h-.2a1.6 1.6 0 0 0-1.5 1Z" />
+                </svg>
+              </button>
+            </div>
           </div>
 
           <div class="month-picker-card">
@@ -511,29 +524,75 @@
       >
         <p id="salaryEstimateMonth" class="salary-estimate-dialog__caption"></p>
 
-        <label class="base-rate-field" for="baseRateInput">
-          <span>Основная ставка</span>
-          <input
-            id="baseRateInput"
-            type="number"
-            inputmode="numeric"
-            min="0"
-            step="10"
-            value="10320"
-          />
-        </label>
-
         <div class="salary-estimate-details">
-          <div class="salary-estimate-row">
-            <span>Всего часов</span>
-            <strong id="salaryTotalHours">0</strong>
-          </div>
           <div id="salaryBreakdown" class="salary-breakdown"></div>
         </div>
 
         <div class="salary-estimate-total">
           <span>Примерная выплата</span>
           <strong id="salaryTotalAmount">0 ₩</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- Настройки расчёта зарплаты -->
+    <div id="paySettingsOverlay" class="salary-estimate-overlay" hidden>
+      <div
+        class="salary-estimate-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Настройки расчёта зарплаты"
+      >
+        <p class="salary-estimate-dialog__caption">Настройки</p>
+
+        <div class="pay-settings-fields">
+          <label class="base-rate-field" for="baseRateInput">
+            <span>Основная ставка</span>
+            <input
+              id="baseRateInput"
+              type="number"
+              inputmode="numeric"
+              min="0"
+              step="10"
+              value="10320"
+            />
+          </label>
+
+          <label class="base-rate-field" for="monthlyBonusInput">
+            <span>Месячный бонус</span>
+            <input
+              id="monthlyBonusInput"
+              type="number"
+              inputmode="numeric"
+              min="0"
+              step="1000"
+              value="0"
+            />
+          </label>
+
+          <label class="base-rate-field" for="weeklyBonusInput">
+            <span>Недельный бонус</span>
+            <input
+              id="weeklyBonusInput"
+              type="number"
+              inputmode="numeric"
+              min="0"
+              step="1000"
+              value="0"
+            />
+          </label>
+
+          <label class="base-rate-field" for="dailyBonusInput">
+            <span>Ежедневный бонус</span>
+            <input
+              id="dailyBonusInput"
+              type="number"
+              inputmode="numeric"
+              min="0"
+              step="1000"
+              value="0"
+            />
+          </label>
         </div>
       </div>
     </div>
@@ -645,6 +704,6 @@
       </div>
     </div>
 
-    <script type="module" src="script.js?v=20260628-1"></script>
+    <script type="module" src="script.js?v=20260628-2"></script>
   </body>
 </html>

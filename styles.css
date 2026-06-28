@@ -652,7 +652,7 @@ h1 {
 }
 
 .base-rate-field {
-  margin-top: 18px;
+  margin-top: 0;
 }
 
 .base-rate-field input {
@@ -664,6 +664,12 @@ h1 {
   outline: none;
   background: var(--surface-strong);
   box-shadow: 0 0 0 4px rgba(23, 25, 28, 0.06);
+}
+
+.pay-settings-fields {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
 }
 
 .save-button {
@@ -757,7 +763,7 @@ h1 {
 
 .calendar-heading {
   display: grid;
-  grid-template-columns: 46px minmax(0, 1fr) 46px;
+  grid-template-columns: 84px minmax(0, 1fr) 84px;
   align-items: center;
   gap: 12px;
   margin-bottom: 22px;
@@ -768,16 +774,21 @@ h1 {
   text-align: center;
 }
 
-.shift-count {
+.history-actions {
   grid-column: 3;
   justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.shift-count,
+.history-settings-button {
   flex: 0 0 auto;
-  padding: 8px 11px;
   border: 1px solid var(--border);
   border-radius: 999px;
   color: var(--text-muted);
   font: inherit;
-  font-size: 0.78rem;
   background: var(--app-block-background);
   cursor: pointer;
   transition:
@@ -785,7 +796,33 @@ h1 {
     background 160ms ease;
 }
 
-.shift-count:active {
+.shift-count {
+  min-width: 34px;
+  min-height: 34px;
+  padding: 0 11px;
+  font-size: 0.78rem;
+}
+
+.history-settings-button {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  place-items: center;
+}
+
+.history-settings-button svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.55;
+}
+
+.shift-count:active,
+.history-settings-button:active {
   transform: scale(0.94);
 }
 
@@ -1066,19 +1103,6 @@ body.profile-page-active .bottom-navigation {
   padding: 16px;
   border-radius: 17px;
   background: var(--app-block-background);
-}
-
-.salary-estimate-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  color: var(--text-muted);
-  font-size: 0.88rem;
-}
-
-.salary-estimate-row strong {
-  color: var(--text-main);
 }
 
 .salary-breakdown {

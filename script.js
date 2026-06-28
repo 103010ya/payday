@@ -17,6 +17,9 @@ const STORAGE_KEY = "paydayShifts";
 const LAST_TIME_KEY = "paydayLastShiftTime";
 // Базовая ставка за час для расчёта зарплаты.
 const BASE_RATE_KEY = "paydayBaseRate";
+const MONTHLY_BONUS_KEY = "paydayMonthlyBonus";
+const WEEKLY_BONUS_KEY = "paydayWeeklyBonus";
+const DAILY_BONUS_KEY = "paydayDailyBonus";
 
 // Получаем нужные элементы страницы один раз при запуске приложения.
 const shiftForm = document.querySelector("#shiftForm");
@@ -90,15 +93,19 @@ const deleteShiftButton = document.querySelector("#deleteShiftButton");
 const salaryEstimateOverlay = document.querySelector(
   "#salaryEstimateOverlay",
 );
+const paySettingsOverlay = document.querySelector("#paySettingsOverlay");
 const salaryEstimateMonth = document.querySelector("#salaryEstimateMonth");
 const baseRateInput = document.querySelector("#baseRateInput");
-const salaryTotalHours = document.querySelector("#salaryTotalHours");
+const monthlyBonusInput = document.querySelector("#monthlyBonusInput");
+const weeklyBonusInput = document.querySelector("#weeklyBonusInput");
+const dailyBonusInput = document.querySelector("#dailyBonusInput");
 const salaryBreakdown = document.querySelector("#salaryBreakdown");
 const salaryTotalAmount = document.querySelector("#salaryTotalAmount");
 const historyScrollArea = document.querySelector(".history-scroll-area");
 const shiftList = document.querySelector("#shiftList");
 const emptyState = document.querySelector("#emptyState");
 const shiftCount = document.querySelector("#shiftCount");
+const paySettingsButton = document.querySelector("#paySettingsButton");
 const navigationButtons = document.querySelectorAll(".nav-button");
 const pages = document.querySelectorAll(".page");
 
@@ -159,7 +166,9 @@ const PAY_CATEGORY_ORDER = [
   "nightOvertime",
 ];
 
-const OVERTIME_START_MINUTE = 8 * 60;
+// Основной рабочий блок длится 9 часов по времени на часах.
+// Например 08:30–17:30. Обед вычитается из этого блока отдельно.
+const REGULAR_WORK_BLOCK_MINUTES = 9 * 60;
 const DEFAULT_BASE_RATE = 10320;
 
 // Возвращает сегодняшнюю дату в формате YYYY-MM-DD без сдвига часового пояса.
@@ -444,6 +453,17 @@ function getMonthKey(dateValue) {
   return dateValue.slice(0, 7);
 }
 
+// Создаёт ключ недели. Нужен, чтобы недельный бонус считать один раз за неделю.
+function getWeekKey(dateValue) {
+  const date = inputValueToDate(dateValue);
+  const dayOffset = (date.getDay() + 6) % 7;
+  const monday = new Date(date);
+
+  monday.setDate(date.getDate() - dayOffset);
+
+  return dateToInputValue(monday);
+}
+
 // Превращает YYYY-MM в понятное русское название, например «Июнь 2026».
 function formatMonthName(monthKey) {
   const [year, month] = monthKey.split("-").map(Number);
@@ -619,11 +639,36 @@ function getBaseRate() {
   return savedRate > 0 ? savedRate : DEFAULT_BASE_RATE;
 }
 
-function setBaseRate(rate) {
-  const safeRate = Math.max(0, Number(rate) || 0);
+function getMoneySetting(key, fallback = 0) {
+  const savedValue = Number(localStorage.getItem(key));
 
-  localStorage.setItem(BASE_RATE_KEY, String(safeRate || DEFAULT_BASE_RATE));
-  baseRateInput.value = String(safeRate || DEFAULT_BASE_RATE);
+  return savedValue > 0 ? savedValue : fallback;
+}
+
+function setMoneySetting(key, input, fallback = 0) {
+  const safeValue = Math.max(0, Number(input.value) || 0);
+  const valueToSave = safeValue || fallback;
+
+  localStorage.setItem(key, String(valueToSave));
+  input.value = String(valueToSave);
+}
+
+function getPaySettings() {
+  return {
+    baseRate: getBaseRate(),
+    monthlyBonus: getMoneySetting(MONTHLY_BONUS_KEY),
+    weeklyBonus: getMoneySetting(WEEKLY_BONUS_KEY),
+    dailyBonus: getMoneySetting(DAILY_BONUS_KEY),
+  };
+}
+
+function updatePaySettingsInputs() {
+  const settings = getPaySettings();
+
+  baseRateInput.value = String(settings.baseRate);
+  monthlyBonusInput.value = String(settings.monthlyBonus);
+  weeklyBonusInput.value = String(settings.weeklyBonus);
+  dailyBonusInput.value = String(settings.dailyBonus);
 }
 
 // Создаёт точную дату и время начала смены.
@@ -650,9 +695,8 @@ function isNightMinute(date) {
   return hour >= 22 || hour < 6;
 }
 
-// Определяет категорию оплаты для одной конкретной минуты работы.
-function getPayCategoryForMinute(date, paidMinuteIndex) {
-  const isOvertime = paidMinuteIndex >= OVERTIME_START_MINUTE;
+// Определяет категорию оплаты для одной конкретной оплачиваемой минуты.
+function getPayCategoryForMinute(date, isOvertime) {
   const isWeekend = isWeekendDate(date);
   const isNight = isNightMinute(date);
 
@@ -691,54 +735,72 @@ function calculateShiftPayBreakdown(shift) {
   );
   const startDateTime = getShiftStartDateTime(shift);
   const durationMinutes = getShiftDurationMinutes(shift);
-  const paidDurationMinutes = Math.max(
-    0,
-    durationMinutes - getShiftBreakMinutes(shift),
+  const lunchBreakMinutes = Number(shift.lunchBreakMinutes) || 0;
+  const dinnerBreakMinutes = Number(shift.dinnerBreakMinutes) || 0;
+  const overtimeStartMinute = Math.min(
+    durationMinutes,
+    REGULAR_WORK_BLOCK_MINUTES,
   );
-  let paidMinuteIndex = 0;
+  const lunchStartMinute = Math.max(0, overtimeStartMinute - lunchBreakMinutes);
+  const dinnerStartMinute = overtimeStartMinute;
 
-  // Идём только по оплачиваемым минутам. Перерывы уже вычтены из общей длительности.
-  for (let minuteIndex = 0; minuteIndex < paidDurationMinutes; minuteIndex += 1) {
+  for (let minuteIndex = 0; minuteIndex < durationMinutes; minuteIndex += 1) {
+    const isLunchMinute =
+      minuteIndex >= lunchStartMinute &&
+      minuteIndex < lunchStartMinute + lunchBreakMinutes;
+    const isDinnerMinute =
+      minuteIndex >= dinnerStartMinute &&
+      minuteIndex < dinnerStartMinute + dinnerBreakMinutes;
+
+    // Обед всегда уменьшает основной блок, ужин всегда уменьшает сверхурочный.
+    if (isLunchMinute || isDinnerMinute) {
+      continue;
+    }
+
     const currentMinute = new Date(
       startDateTime.getTime() + minuteIndex * 60 * 1000,
     );
-    const category = getPayCategoryForMinute(currentMinute, paidMinuteIndex);
+    const isOvertime = minuteIndex >= overtimeStartMinute;
+    const category = getPayCategoryForMinute(currentMinute, isOvertime);
 
     breakdown[category] += 1;
-    paidMinuteIndex += 1;
   }
 
   return breakdown;
 }
 
 // Складывает расчёт всех смен выбранного месяца.
-function calculateMonthPaySummary(shifts, baseRate) {
+function calculateMonthPaySummary(shifts, paySettings) {
   const breakdown = Object.fromEntries(
     PAY_CATEGORY_ORDER.map((category) => [category, 0]),
   );
+  const workedDays = new Set();
+  const workedWeeks = new Set();
 
   shifts.forEach((shift) => {
     const shiftBreakdown = calculateShiftPayBreakdown(shift);
+
+    workedDays.add(shift.date);
+    workedWeeks.add(getWeekKey(shift.date));
 
     PAY_CATEGORY_ORDER.forEach((category) => {
       breakdown[category] += shiftBreakdown[category];
     });
   });
 
-  const totalMinutes = PAY_CATEGORY_ORDER.reduce(
-    (sum, category) => sum + breakdown[category],
-    0,
-  );
   const totalAmount = PAY_CATEGORY_ORDER.reduce((sum, category) => {
-    const rate = baseRate * PAY_CATEGORIES[category].multiplier;
+    const rate = paySettings.baseRate * PAY_CATEGORIES[category].multiplier;
 
     return sum + Math.round((breakdown[category] * rate) / 60);
   }, 0);
+  const bonusAmount =
+    (shifts.length > 0 ? paySettings.monthlyBonus : 0) +
+    workedWeeks.size * paySettings.weeklyBonus +
+    workedDays.size * paySettings.dailyBonus;
 
   return {
     breakdown,
-    totalMinutes,
-    totalAmount,
+    totalAmount: totalAmount + bonusAmount,
   };
 }
 
@@ -827,12 +889,10 @@ function renderSalaryEstimate() {
   const shiftsForMonth = getSavedShifts().filter(
     (shift) => getMonthKey(shift.date) === monthSelect.value,
   );
-  const baseRate = getBaseRate();
-  const paySummary = calculateMonthPaySummary(shiftsForMonth, baseRate);
+  const paySettings = getPaySettings();
+  const paySummary = calculateMonthPaySummary(shiftsForMonth, paySettings);
 
   salaryEstimateMonth.textContent = formatMonthName(monthSelect.value);
-  baseRateInput.value = String(baseRate);
-  salaryTotalHours.textContent = formatHoursAndMinutes(paySummary.totalMinutes);
   salaryBreakdown.replaceChildren();
 
   PAY_CATEGORY_ORDER.forEach((category) => {
@@ -840,7 +900,7 @@ function renderSalaryEstimate() {
 
     if (minutes > 0) {
       salaryBreakdown.append(
-        createSalaryBreakdownRow(category, minutes, baseRate),
+        createSalaryBreakdownRow(category, minutes, paySettings.baseRate),
       );
     }
   });
@@ -857,6 +917,20 @@ function openSalaryEstimate() {
 
 function closeSalaryEstimate() {
   salaryEstimateOverlay.hidden = true;
+  document.body.classList.remove("dialog-open");
+  document.activeElement?.blur();
+  resetHistoryPosition();
+}
+
+function openPaySettings() {
+  document.activeElement?.blur();
+  updatePaySettingsInputs();
+  paySettingsOverlay.hidden = false;
+  document.body.classList.add("dialog-open");
+}
+
+function closePaySettings() {
+  paySettingsOverlay.hidden = true;
   document.body.classList.remove("dialog-open");
   document.activeElement?.blur();
   resetHistoryPosition();
@@ -1362,15 +1436,32 @@ nextHistoryMonthButton.addEventListener("click", () => {
 });
 
 shiftCount.addEventListener("click", openSalaryEstimate);
+paySettingsButton.addEventListener("click", openPaySettings);
 
-baseRateInput.addEventListener("change", () => {
-  setBaseRate(baseRateInput.value);
-  renderSalaryEstimate();
+[
+  [baseRateInput, BASE_RATE_KEY, DEFAULT_BASE_RATE],
+  [monthlyBonusInput, MONTHLY_BONUS_KEY, 0],
+  [weeklyBonusInput, WEEKLY_BONUS_KEY, 0],
+  [dailyBonusInput, DAILY_BONUS_KEY, 0],
+].forEach(([input, key, fallback]) => {
+  input.addEventListener("change", () => {
+    setMoneySetting(key, input, fallback);
+
+    if (!salaryEstimateOverlay.hidden) {
+      renderSalaryEstimate();
+    }
+  });
 });
 
 salaryEstimateOverlay.addEventListener("click", (event) => {
   if (event.target === salaryEstimateOverlay) {
     closeSalaryEstimate();
+  }
+});
+
+paySettingsOverlay.addEventListener("click", (event) => {
+  if (event.target === paySettingsOverlay) {
+    closePaySettings();
   }
 });
 
@@ -1515,6 +1606,8 @@ document.addEventListener("keydown", (event) => {
       closeDatePicker();
     } else if (!salaryEstimateOverlay.hidden) {
       closeSalaryEstimate();
+    } else if (!paySettingsOverlay.hidden) {
+      closePaySettings();
     } else if (!shiftActionsOverlay.hidden) {
       closeShiftActions();
     } else if (!timePickerOverlay.hidden) {
@@ -1530,7 +1623,7 @@ shiftDateInput.value = getTodayValue();
 restoreLastShiftValues();
 handleSelectedDateChange();
 
-baseRateInput.value = String(getBaseRate());
+updatePaySettingsInputs();
 
 updateAccountView(null);
 
