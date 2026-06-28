@@ -13,6 +13,7 @@ import {
 
 // Ключ, под которым список смен хранится внутри localStorage.
 const STORAGE_KEY = "paydayShifts";
+const LAST_USER_KEY = "paydayLastUserId";
 // Отдельный ключ для последних введённых значений времени.
 const LAST_TIME_KEY = "paydayLastShiftTime";
 // Базовая ставка за час для расчёта зарплаты.
@@ -112,6 +113,7 @@ const pages = document.querySelectorAll(".page");
 let messageTimer;
 let activePageId = "homePage";
 let currentUser = null;
+let activeStorageUserId = localStorage.getItem(LAST_USER_KEY) || null;
 let visibleCalendarMonth = new Date();
 let selectedShiftId = null;
 let editingShiftId = null;
@@ -415,7 +417,9 @@ function closeBreakPicker(restoreFocus = true) {
 
 // Безопасно читает сохранённые смены. Если данных ещё нет, возвращает пустой список.
 function getActiveStorageKey() {
-  return currentUser ? `${STORAGE_KEY}:${currentUser.uid}` : STORAGE_KEY;
+  const userId = currentUser?.uid || activeStorageUserId;
+
+  return userId ? `${STORAGE_KEY}:${userId}` : STORAGE_KEY;
 }
 
 function getSavedShifts() {
@@ -1177,17 +1181,24 @@ function getFirebaseErrorMessage(error) {
   return messages[error.code] || "Не удалось выполнить операцию";
 }
 
-function updateAccountView(user) {
+function updateAccountView(user, isAuthResolved = true) {
   const isSignedIn = Boolean(user);
 
   authGuestView.hidden = isSignedIn;
   authUserView.hidden = !isSignedIn;
 
   if (isSignedIn) {
+    activeStorageUserId = user.uid;
+    localStorage.setItem(LAST_USER_KEY, user.uid);
     accountName.textContent = user.displayName || "Пользователь";
     accountEmail.textContent = user.email || "";
     setAuthMessage("");
   } else {
+    if (isAuthResolved) {
+      activeStorageUserId = null;
+      localStorage.removeItem(LAST_USER_KEY);
+    }
+
     showAuthForm("login");
   }
 }
@@ -1202,12 +1213,18 @@ async function synchronizeUserShifts(user) {
   accountSyncText.textContent = "Синхронизация данных…";
 
   let guestShifts = [];
+  let localUserShifts = [];
 
   try {
     const savedGuestData = JSON.parse(
       localStorage.getItem(STORAGE_KEY) || "[]",
     );
     guestShifts = Array.isArray(savedGuestData) ? savedGuestData : [];
+
+    const savedUserData = JSON.parse(
+      localStorage.getItem(`${STORAGE_KEY}:${user.uid}`) || "[]",
+    );
+    localUserShifts = Array.isArray(savedUserData) ? savedUserData : [];
   } catch (error) {
     // Повреждённые локальные данные не должны мешать входу в профиль.
     console.error("Не удалось прочитать локальные смены:", error);
@@ -1218,6 +1235,7 @@ async function synchronizeUserShifts(user) {
 
   guestShifts.forEach((shift) => mergedByDate.set(shift.date, shift));
   cloudShifts.forEach((shift) => mergedByDate.set(shift.date, shift));
+  localUserShifts.forEach((shift) => mergedByDate.set(shift.date, shift));
 
   const mergedShifts = [...mergedByDate.values()];
   localStorage.setItem(
@@ -1226,11 +1244,16 @@ async function synchronizeUserShifts(user) {
   );
 
   const cloudDates = new Set(cloudShifts.map((shift) => shift.date));
-  const shiftsToUpload = guestShifts.filter(
-    (shift) => !cloudDates.has(shift.date),
+  const shiftsToUploadByDate = new Map();
+
+  guestShifts
+    .filter((shift) => !cloudDates.has(shift.date))
+    .forEach((shift) => shiftsToUploadByDate.set(shift.date, shift));
+  localUserShifts.forEach((shift) =>
+    shiftsToUploadByDate.set(shift.date, shift),
   );
 
-  await uploadCloudShifts(user.uid, shiftsToUpload);
+  await uploadCloudShifts(user.uid, [...shiftsToUploadByDate.values()]);
   accountSyncText.textContent = "Данные синхронизированы";
   refreshShiftInterface();
 }
@@ -1625,7 +1648,7 @@ handleSelectedDateChange();
 
 updatePaySettingsInputs();
 
-updateAccountView(null);
+updateAccountView(null, false);
 
 observeAuthState(async (user) => {
   currentUser = user;

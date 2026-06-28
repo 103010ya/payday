@@ -7,40 +7,78 @@ let auth = null;
 let db = null;
 let firebaseAuth;
 let firestore;
+let firebaseReadyPromise = null;
 
-if (isFirebaseConfigured) {
-  // Загружаем Firebase только после заполнения конфигурации.
-  // Благодаря этому локальная версия продолжает работать без Firebase и сети.
-  const [firebaseApp, loadedFirebaseAuth, loadedFirestore] = await Promise.all([
-    import("https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js"),
-    import("https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js"),
-    import("https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js"),
-  ]);
+async function ensureFirebaseReady() {
+  if (!isFirebaseConfigured) {
+    return false;
+  }
 
-  firebaseAuth = loadedFirebaseAuth;
-  firestore = loadedFirestore;
+  if (auth && db) {
+    return true;
+  }
 
-  const app = firebaseApp.initializeApp(firebaseConfig);
-  auth = firebaseAuth.getAuth(app);
-  db = firestore.getFirestore(app);
-  await firebaseAuth.setPersistence(
-    auth,
-    firebaseAuth.browserLocalPersistence,
-  );
+  if (!firebaseReadyPromise) {
+    firebaseReadyPromise = (async () => {
+      // Firebase загружается лениво: сначала приложение показывает локальные данные,
+      // а сеть подключается в фоне только когда нужна авторизация или синхронизация.
+      const [firebaseApp, loadedFirebaseAuth, loadedFirestore] =
+        await Promise.all([
+          import("https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js"),
+          import("https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js"),
+          import("https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js"),
+        ]);
+
+      firebaseAuth = loadedFirebaseAuth;
+      firestore = loadedFirestore;
+
+      const app = firebaseApp.initializeApp(firebaseConfig);
+      auth = firebaseAuth.getAuth(app);
+      db = firestore.getFirestore(app);
+      await firebaseAuth.setPersistence(
+        auth,
+        firebaseAuth.browserLocalPersistence,
+      );
+
+      return true;
+    })();
+  }
+
+  return firebaseReadyPromise;
 }
 
 export { isFirebaseConfigured };
 
 export function observeAuthState(callback) {
-  if (!auth) {
+  if (!isFirebaseConfigured) {
     callback(null);
     return () => {};
   }
 
-  return firebaseAuth.onAuthStateChanged(auth, callback);
+  let unsubscribe = () => {};
+  let isActive = true;
+
+  ensureFirebaseReady()
+    .then((isReady) => {
+      if (!isReady || !isActive) {
+        return;
+      }
+
+      unsubscribe = firebaseAuth.onAuthStateChanged(auth, callback);
+    })
+    .catch((error) => {
+      console.error("Не удалось загрузить Firebase:", error);
+    });
+
+  return () => {
+    isActive = false;
+    unsubscribe();
+  };
 }
 
 export async function registerAccount(name, email, password) {
+  await ensureFirebaseReady();
+
   const credential = await firebaseAuth.createUserWithEmailAndPassword(
     auth,
     email,
@@ -58,6 +96,8 @@ export async function registerAccount(name, email, password) {
 }
 
 export async function loginAccount(email, password) {
+  await ensureFirebaseReady();
+
   const credential = await firebaseAuth.signInWithEmailAndPassword(
     auth,
     email,
@@ -66,15 +106,21 @@ export async function loginAccount(email, password) {
   return credential.user;
 }
 
-export function logoutAccount() {
+export async function logoutAccount() {
+  await ensureFirebaseReady();
+
   return firebaseAuth.signOut(auth);
 }
 
-export function resetAccountPassword(email) {
+export async function resetAccountPassword(email) {
+  await ensureFirebaseReady();
+
   return firebaseAuth.sendPasswordResetEmail(auth, email);
 }
 
 export async function loadCloudShifts(userId) {
+  await ensureFirebaseReady();
+
   const snapshot = await firestore.getDocs(
     firestore.collection(db, "users", userId, "shifts"),
   );
@@ -82,7 +128,9 @@ export async function loadCloudShifts(userId) {
   return snapshot.docs.map((shiftDocument) => shiftDocument.data());
 }
 
-export function saveCloudShift(userId, shift) {
+export async function saveCloudShift(userId, shift) {
+  await ensureFirebaseReady();
+
   return firestore.setDoc(
     firestore.doc(db, "users", userId, "shifts", shift.date),
     {
@@ -97,13 +145,17 @@ export function saveCloudShift(userId, shift) {
   );
 }
 
-export function deleteCloudShift(userId, shiftDate) {
+export async function deleteCloudShift(userId, shiftDate) {
+  await ensureFirebaseReady();
+
   return firestore.deleteDoc(
     firestore.doc(db, "users", userId, "shifts", shiftDate),
   );
 }
 
 export async function uploadCloudShifts(userId, shifts) {
+  await ensureFirebaseReady();
+
   if (shifts.length === 0) {
     return;
   }
