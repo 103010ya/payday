@@ -18,6 +18,7 @@ const LAST_USER_KEY = "paydayLastUserId";
 const LAST_TIME_KEY = "paydayLastShiftTime";
 // Базовая ставка за час для расчёта зарплаты.
 const BASE_RATE_KEY = "paydayBaseRate";
+const EXTRA_RATE_KEY = "paydayExtraRate";
 const MONTHLY_BONUS_KEY = "paydayMonthlyBonus";
 const WEEKLY_BONUS_KEY = "paydayWeeklyBonus";
 const DAILY_BONUS_KEY = "paydayDailyBonus";
@@ -97,6 +98,7 @@ const salaryEstimateOverlay = document.querySelector(
 const paySettingsOverlay = document.querySelector("#paySettingsOverlay");
 const salaryEstimateMonth = document.querySelector("#salaryEstimateMonth");
 const baseRateInput = document.querySelector("#baseRateInput");
+const extraRateInput = document.querySelector("#extraRateInput");
 const monthlyBonusInput = document.querySelector("#monthlyBonusInput");
 const weeklyBonusInput = document.querySelector("#weeklyBonusInput");
 const dailyBonusInput = document.querySelector("#dailyBonusInput");
@@ -168,9 +170,16 @@ const PAY_CATEGORY_ORDER = [
   "nightOvertime",
 ];
 
+const EXTRA_RATE_CATEGORIES = new Set([
+  "overtime",
+  "weekend",
+  "weekendOvertime",
+]);
+
 // Основной рабочий блок длится 9 часов по времени на часах.
 // Например 08:30–17:30. Обед вычитается из этого блока отдельно.
 const REGULAR_WORK_BLOCK_MINUTES = 9 * 60;
+const STANDARD_LUNCH_MINUTES = 60;
 const DEFAULT_BASE_RATE = 10320;
 
 // Возвращает сегодняшнюю дату в формате YYYY-MM-DD без сдвига часового пояса.
@@ -468,6 +477,53 @@ function getWeekKey(dateValue) {
   return dateToInputValue(monday);
 }
 
+function isWeekdayDateValue(dateValue) {
+  return !isWeekendDate(inputValueToDate(dateValue));
+}
+
+// День считается полноценным для бонуса, если закрыт основной рабочий блок:
+// 8 часов работы + введённое время обеда.
+function isFullWorkdayShift(shift) {
+  const lunchBreakMinutes = Number(shift.lunchBreakMinutes) || 0;
+  const requiredMinutes = 8 * 60 + lunchBreakMinutes;
+
+  return getShiftDurationMinutes(shift) >= requiredMinutes;
+}
+
+function getWeekdayKeysInMonth(monthKey) {
+  const [year, month] = monthKey.split("-").map(Number);
+  const date = new Date(year, month - 1, 1);
+  const weekdayKeys = [];
+
+  while (date.getMonth() === month - 1) {
+    const dateValue = dateToInputValue(date);
+
+    if (isWeekdayDateValue(dateValue)) {
+      weekdayKeys.push(dateValue);
+    }
+
+    date.setDate(date.getDate() + 1);
+  }
+
+  return weekdayKeys;
+}
+
+function getCompletedWeekCount(monthKey, fullWorkdayDates) {
+  const weekdaysByWeek = new Map();
+
+  getWeekdayKeysInMonth(monthKey).forEach((dateValue) => {
+    const weekKey = getWeekKey(dateValue);
+    const weekDates = weekdaysByWeek.get(weekKey) || [];
+
+    weekDates.push(dateValue);
+    weekdaysByWeek.set(weekKey, weekDates);
+  });
+
+  return [...weekdaysByWeek.values()].filter((weekDates) =>
+    weekDates.every((dateValue) => fullWorkdayDates.has(dateValue)),
+  ).length;
+}
+
 // Превращает YYYY-MM в понятное русское название, например «Июнь 2026».
 function formatMonthName(monthKey) {
   const [year, month] = monthKey.split("-").map(Number);
@@ -643,6 +699,12 @@ function getBaseRate() {
   return savedRate > 0 ? savedRate : DEFAULT_BASE_RATE;
 }
 
+function getExtraRate(baseRate = getBaseRate()) {
+  const savedRate = Number(localStorage.getItem(EXTRA_RATE_KEY));
+
+  return savedRate > 0 ? savedRate : baseRate;
+}
+
 function getMoneySetting(key, fallback = 0) {
   const savedValue = Number(localStorage.getItem(key));
 
@@ -658,8 +720,11 @@ function setMoneySetting(key, input, fallback = 0) {
 }
 
 function getPaySettings() {
+  const baseRate = getBaseRate();
+
   return {
-    baseRate: getBaseRate(),
+    baseRate,
+    extraRate: getExtraRate(baseRate),
     monthlyBonus: getMoneySetting(MONTHLY_BONUS_KEY),
     weeklyBonus: getMoneySetting(WEEKLY_BONUS_KEY),
     dailyBonus: getMoneySetting(DAILY_BONUS_KEY),
@@ -670,6 +735,7 @@ function updatePaySettingsInputs() {
   const settings = getPaySettings();
 
   baseRateInput.value = String(settings.baseRate);
+  extraRateInput.value = String(settings.extraRate);
   monthlyBonusInput.value = String(settings.monthlyBonus);
   weeklyBonusInput.value = String(settings.weeklyBonus);
   dailyBonusInput.value = String(settings.dailyBonus);
@@ -741,11 +807,15 @@ function calculateShiftPayBreakdown(shift) {
   const durationMinutes = getShiftDurationMinutes(shift);
   const lunchBreakMinutes = Number(shift.lunchBreakMinutes) || 0;
   const dinnerBreakMinutes = Number(shift.dinnerBreakMinutes) || 0;
-  const overtimeStartMinute = Math.min(
-    durationMinutes,
-    REGULAR_WORK_BLOCK_MINUTES,
+  const overtimeStartMinute = REGULAR_WORK_BLOCK_MINUTES;
+  const lunchStartMinute = Math.max(
+    0,
+    overtimeStartMinute - STANDARD_LUNCH_MINUTES,
   );
-  const lunchStartMinute = Math.max(0, overtimeStartMinute - lunchBreakMinutes);
+  const shortLunchOvertimeStartMinute = Math.min(
+    overtimeStartMinute,
+    lunchStartMinute + lunchBreakMinutes,
+  );
   const dinnerStartMinute = overtimeStartMinute;
 
   for (let minuteIndex = 0; minuteIndex < durationMinutes; minuteIndex += 1) {
@@ -764,7 +834,11 @@ function calculateShiftPayBreakdown(shift) {
     const currentMinute = new Date(
       startDateTime.getTime() + minuteIndex * 60 * 1000,
     );
-    const isOvertime = minuteIndex >= overtimeStartMinute;
+    const isShortLunchOvertime =
+      lunchBreakMinutes < STANDARD_LUNCH_MINUTES &&
+      minuteIndex >= shortLunchOvertimeStartMinute &&
+      minuteIndex < overtimeStartMinute;
+    const isOvertime = minuteIndex >= overtimeStartMinute || isShortLunchOvertime;
     const category = getPayCategoryForMinute(currentMinute, isOvertime);
 
     breakdown[category] += 1;
@@ -774,18 +848,18 @@ function calculateShiftPayBreakdown(shift) {
 }
 
 // Складывает расчёт всех смен выбранного месяца.
-function calculateMonthPaySummary(shifts, paySettings) {
+function calculateMonthPaySummary(shifts, paySettings, monthKey) {
   const breakdown = Object.fromEntries(
     PAY_CATEGORY_ORDER.map((category) => [category, 0]),
   );
-  const workedDays = new Set();
-  const workedWeeks = new Set();
+  const fullWorkdayDates = new Set();
 
   shifts.forEach((shift) => {
     const shiftBreakdown = calculateShiftPayBreakdown(shift);
 
-    workedDays.add(shift.date);
-    workedWeeks.add(getWeekKey(shift.date));
+    if (isFullWorkdayShift(shift)) {
+      fullWorkdayDates.add(shift.date);
+    }
 
     PAY_CATEGORY_ORDER.forEach((category) => {
       breakdown[category] += shiftBreakdown[category];
@@ -793,14 +867,22 @@ function calculateMonthPaySummary(shifts, paySettings) {
   });
 
   const totalAmount = PAY_CATEGORY_ORDER.reduce((sum, category) => {
-    const rate = paySettings.baseRate * PAY_CATEGORIES[category].multiplier;
+    const categoryBaseRate = EXTRA_RATE_CATEGORIES.has(category)
+      ? paySettings.extraRate
+      : paySettings.baseRate;
+    const rate = categoryBaseRate * PAY_CATEGORIES[category].multiplier;
 
     return sum + Math.round((breakdown[category] * rate) / 60);
   }, 0);
+  const monthWeekdayKeys = getWeekdayKeysInMonth(monthKey);
+  const isFullMonth =
+    monthWeekdayKeys.length > 0 &&
+    monthWeekdayKeys.every((dateValue) => fullWorkdayDates.has(dateValue));
+  const completedWeekCount = getCompletedWeekCount(monthKey, fullWorkdayDates);
   const bonusAmount =
-    (shifts.length > 0 ? paySettings.monthlyBonus : 0) +
-    workedWeeks.size * paySettings.weeklyBonus +
-    workedDays.size * paySettings.dailyBonus;
+    (isFullMonth ? paySettings.monthlyBonus : 0) +
+    completedWeekCount * paySettings.weeklyBonus +
+    fullWorkdayDates.size * paySettings.dailyBonus;
 
   return {
     breakdown,
@@ -808,8 +890,14 @@ function calculateMonthPaySummary(shifts, paySettings) {
   };
 }
 
+function getRateForCategory(category, paySettings) {
+  return EXTRA_RATE_CATEGORIES.has(category)
+    ? paySettings.extraRate
+    : paySettings.baseRate;
+}
+
 // Создаёт строку с количеством часов по одной категории.
-function createSalaryBreakdownRow(category, minutes, baseRate) {
+function createSalaryBreakdownRow(category, minutes, paySettings) {
   const row = document.createElement("div");
   row.className = "salary-breakdown-row";
 
@@ -821,7 +909,9 @@ function createSalaryBreakdownRow(category, minutes, baseRate) {
 
   const rate = document.createElement("small");
   const multiplier = PAY_CATEGORIES[category].multiplier;
-  const hourlyRate = Math.round(baseRate * multiplier);
+  const hourlyRate = Math.round(
+    getRateForCategory(category, paySettings) * multiplier,
+  );
 
   rate.textContent = `×${formatMultiplier(multiplier)} · ${formatWon(hourlyRate)}/ч`;
 
@@ -894,7 +984,11 @@ function renderSalaryEstimate() {
     (shift) => getMonthKey(shift.date) === monthSelect.value,
   );
   const paySettings = getPaySettings();
-  const paySummary = calculateMonthPaySummary(shiftsForMonth, paySettings);
+  const paySummary = calculateMonthPaySummary(
+    shiftsForMonth,
+    paySettings,
+    monthSelect.value,
+  );
 
   salaryEstimateMonth.textContent = formatMonthName(monthSelect.value);
   salaryBreakdown.replaceChildren();
@@ -904,7 +998,7 @@ function renderSalaryEstimate() {
 
     if (minutes > 0) {
       salaryBreakdown.append(
-        createSalaryBreakdownRow(category, minutes, paySettings.baseRate),
+        createSalaryBreakdownRow(category, minutes, paySettings),
       );
     }
   });
@@ -1463,12 +1557,16 @@ paySettingsButton.addEventListener("click", openPaySettings);
 
 [
   [baseRateInput, BASE_RATE_KEY, DEFAULT_BASE_RATE],
+  [extraRateInput, EXTRA_RATE_KEY, () => getBaseRate()],
   [monthlyBonusInput, MONTHLY_BONUS_KEY, 0],
   [weeklyBonusInput, WEEKLY_BONUS_KEY, 0],
   [dailyBonusInput, DAILY_BONUS_KEY, 0],
 ].forEach(([input, key, fallback]) => {
   input.addEventListener("change", () => {
-    setMoneySetting(key, input, fallback);
+    const fallbackValue =
+      typeof fallback === "function" ? fallback() : fallback;
+
+    setMoneySetting(key, input, fallbackValue);
 
     if (!salaryEstimateOverlay.hidden) {
       renderSalaryEstimate();
