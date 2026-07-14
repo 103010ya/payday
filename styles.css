@@ -1098,26 +1098,27 @@ body.profile-page-active .bottom-navigation {
 
 .salary-estimate-details {
   display: grid;
-  gap: 12px;
+  gap: 0;
   margin-top: 16px;
-  padding: 16px;
-  border-radius: 17px;
-  background: var(--app-block-background);
+  padding: 0;
+  background: transparent;
 }
 
 .salary-breakdown {
   display: grid;
-  gap: 8px;
+  gap: 7px;
 }
 
 .salary-breakdown-row {
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 3px 12px;
-  padding-top: 10px;
-  border-top: 1px solid rgba(138, 146, 155, 0.22);
+  gap: 4px 12px;
+  padding: 11px 13px;
+  border: 1px solid rgba(31, 35, 40, 0.06);
+  border-radius: 14px;
   color: var(--text-muted);
   font-size: 0.84rem;
+  background: var(--app-block-background);
 }
 
 .salary-breakdown-row strong {

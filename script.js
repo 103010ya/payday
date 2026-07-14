@@ -579,6 +579,15 @@ function formatHoursAndMinutes(totalMinutes) {
   return minutes > 0 ? `${hours} ч ${minutes} мин` : `${hours} ч`;
 }
 
+// Для расчёта зарплаты показываем часы компактно: 90 минут = 1,5.
+function formatDecimalHours(totalMinutes) {
+  const hours = totalMinutes / 60;
+
+  return new Intl.NumberFormat("ru-RU", {
+    maximumFractionDigits: 2,
+  }).format(hours);
+}
+
 function formatWon(amount) {
   return `${new Intl.NumberFormat("ru-RU").format(amount)} ₩`;
 }
@@ -879,13 +888,31 @@ function calculateMonthPaySummary(shifts, paySettings, monthKey) {
     monthWeekdayKeys.length > 0 &&
     monthWeekdayKeys.every((dateValue) => fullWorkdayDates.has(dateValue));
   const completedWeekCount = getCompletedWeekCount(monthKey, fullWorkdayDates);
+  const bonuses = {
+    daily: {
+      label: "Ежедневный бонус",
+      count: fullWorkdayDates.size,
+      rate: paySettings.dailyBonus,
+    },
+    weekly: {
+      label: "Недельный бонус",
+      count: completedWeekCount,
+      rate: paySettings.weeklyBonus,
+    },
+    monthly: {
+      label: "Месячный бонус",
+      count: isFullMonth ? 1 : 0,
+      rate: paySettings.monthlyBonus,
+    },
+  };
   const bonusAmount =
-    (isFullMonth ? paySettings.monthlyBonus : 0) +
-    completedWeekCount * paySettings.weeklyBonus +
-    fullWorkdayDates.size * paySettings.dailyBonus;
+    bonuses.monthly.count * bonuses.monthly.rate +
+    bonuses.weekly.count * bonuses.weekly.rate +
+    bonuses.daily.count * bonuses.daily.rate;
 
   return {
     breakdown,
+    bonuses,
     totalAmount: totalAmount + bonusAmount,
   };
 }
@@ -905,7 +932,7 @@ function createSalaryBreakdownRow(category, minutes, paySettings) {
   label.textContent = PAY_CATEGORIES[category].label;
 
   const value = document.createElement("strong");
-  value.textContent = formatHoursAndMinutes(minutes);
+  value.textContent = formatDecimalHours(minutes);
 
   const rate = document.createElement("small");
   const multiplier = PAY_CATEGORIES[category].multiplier;
@@ -913,7 +940,25 @@ function createSalaryBreakdownRow(category, minutes, paySettings) {
     getRateForCategory(category, paySettings) * multiplier,
   );
 
-  rate.textContent = `×${formatMultiplier(multiplier)} · ${formatWon(hourlyRate)}/ч`;
+  rate.textContent = `×${formatMultiplier(multiplier)} · ${formatWon(hourlyRate)}`;
+
+  row.append(label, value, rate);
+  return row;
+}
+
+// Создаёт строку бонуса в общем списке расчёта.
+function createBonusBreakdownRow(bonus) {
+  const row = document.createElement("div");
+  row.className = "salary-breakdown-row";
+
+  const label = document.createElement("span");
+  label.textContent = bonus.label;
+
+  const value = document.createElement("strong");
+  value.textContent = String(bonus.count);
+
+  const rate = document.createElement("small");
+  rate.textContent = formatWon(bonus.rate);
 
   row.append(label, value, rate);
   return row;
@@ -1000,6 +1045,12 @@ function renderSalaryEstimate() {
       salaryBreakdown.append(
         createSalaryBreakdownRow(category, minutes, paySettings),
       );
+    }
+  });
+
+  Object.values(paySummary.bonuses).forEach((bonus) => {
+    if (bonus.count > 0 && bonus.rate > 0) {
+      salaryBreakdown.append(createBonusBreakdownRow(bonus));
     }
   });
 
