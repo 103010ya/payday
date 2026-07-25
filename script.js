@@ -118,6 +118,7 @@ let currentUser = null;
 let activeStorageUserId = localStorage.getItem(LAST_USER_KEY) || null;
 let visibleCalendarMonth = new Date();
 let selectedShiftId = null;
+let selectedDayOffDate = null;
 let editingShiftId = null;
 let editingOriginalDate = null;
 let activeTimeField = null;
@@ -1080,7 +1081,28 @@ function resetHistoryPosition() {
 // Открывает меню действий для смены, на которую нажал пользователь.
 function openShiftActions(shift) {
   selectedShiftId = shift.id;
+  selectedDayOffDate = null;
+  deleteShiftButton.hidden = false;
+  deleteShiftButton.disabled = false;
+  editShiftButton.parentElement.classList.remove(
+    "shift-actions-dialog__buttons--single",
+  );
   shiftActionsDetails.replaceChildren(createShiftDetails(shift));
+  shiftActionsOverlay.hidden = false;
+  document.body.classList.add("dialog-open");
+  editShiftButton.focus();
+}
+
+// Открывает такое же меню для прошедшего дня без смены.
+function openDayOffActions(dateValue) {
+  selectedShiftId = null;
+  selectedDayOffDate = dateValue;
+  deleteShiftButton.hidden = true;
+  deleteShiftButton.disabled = true;
+  editShiftButton.parentElement.classList.add(
+    "shift-actions-dialog__buttons--single",
+  );
+  shiftActionsDetails.replaceChildren(createDayOffDetails(dateValue));
   shiftActionsOverlay.hidden = false;
   document.body.classList.add("dialog-open");
   editShiftButton.focus();
@@ -1089,10 +1111,19 @@ function openShiftActions(shift) {
 function closeShiftActions(restoreFocus = true) {
   shiftActionsOverlay.hidden = true;
   document.body.classList.remove("dialog-open");
+  deleteShiftButton.hidden = false;
+  deleteShiftButton.disabled = false;
+  editShiftButton.parentElement.classList.remove(
+    "shift-actions-dialog__buttons--single",
+  );
 
   if (restoreFocus && selectedShiftId) {
     shiftList
       .querySelector(`[data-shift-id="${CSS.escape(selectedShiftId)}"]`)
+      ?.focus();
+  } else if (restoreFocus && selectedDayOffDate) {
+    shiftList
+      .querySelector(`[data-day-off-date="${CSS.escape(selectedDayOffDate)}"]`)
       ?.focus();
   }
 }
@@ -1195,7 +1226,97 @@ function createTimeRow(label, time) {
   return row;
 }
 
-// Показывает только смены, относящиеся к выбранному месяцу.
+// Создаёт компактную карточку прошедшего дня без сохранённой смены.
+function createDayOffCard(dateValue) {
+  const card = document.createElement("button");
+  card.type = "button";
+  card.className = "day-off-card";
+  card.dataset.dayOffDate = dateValue;
+  card.setAttribute(
+    "aria-label",
+    `Выходной ${formatShiftDate(dateValue)} ${formatShortWeekday(dateValue)}`,
+  );
+
+  card.append(createDayOffDetails(dateValue));
+  card.addEventListener("click", () => openDayOffActions(dateValue));
+
+  return card;
+}
+
+// Создаёт содержимое карточки выходного для списка и всплывающего окна.
+function createDayOffDetails(dateValue) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "day-off-details";
+
+  const dateLine = document.createElement("div");
+  dateLine.className = "shift-card__date-line";
+
+  const date = document.createElement("h2");
+  date.className = "shift-card__date";
+  date.textContent = formatShiftDate(dateValue);
+
+  const weekday = document.createElement("span");
+  weekday.className = "shift-card__weekday";
+  weekday.textContent = formatShortWeekday(dateValue);
+
+  const status = document.createElement("p");
+  status.className = "day-off-card__status";
+  status.textContent = "Выходной";
+
+  dateLine.append(date, weekday);
+  wrapper.append(dateLine, status);
+
+  return wrapper;
+}
+
+// Возвращает все прошедшие даты выбранного месяца, не включая сегодняшний день.
+function getPastMonthDates(monthKey) {
+  const [year, month] = monthKey.split("-").map(Number);
+  const todayValue = getTodayValue();
+  const date = new Date(year, month - 1, 1);
+  const dates = [];
+
+  while (date.getMonth() === month - 1) {
+    const dateValue = dateToInputValue(date);
+
+    if (dateValue >= todayValue) {
+      break;
+    }
+
+    dates.push(dateValue);
+    date.setDate(date.getDate() + 1);
+  }
+
+  return dates;
+}
+
+// Собирает список истории: сохранённые смены + прошедшие дни без смены.
+function getHistoryItems(monthKey, shiftsForMonth) {
+  if (shiftsForMonth.length === 0) {
+    return [];
+  }
+
+  const shiftsByDate = new Map();
+
+  shiftsForMonth.forEach((shift) => shiftsByDate.set(shift.date, shift));
+
+  const dateKeys = new Set([
+    ...getPastMonthDates(monthKey),
+    ...shiftsForMonth.map((shift) => shift.date),
+  ]);
+
+  return [...dateKeys]
+    .sort((firstDate, secondDate) => secondDate.localeCompare(firstDate))
+    .map((dateValue) => {
+      const shift = shiftsByDate.get(dateValue);
+
+      return shift
+        ? { type: "shift", date: dateValue, shift }
+        : { type: "dayOff", date: dateValue };
+    });
+}
+
+// Показывает смены выбранного месяца и прошедшие дни без смен.
 function renderShifts() {
   const selectedMonth = monthSelect.value;
   const shiftsForMonth = getSavedShifts()
@@ -1205,13 +1326,18 @@ function renderShifts() {
 
       return dateComparison || secondShift.startTime.localeCompare(firstShift.startTime);
     });
+  const historyItems = getHistoryItems(selectedMonth, shiftsForMonth);
 
   shiftList.replaceChildren();
-  shiftsForMonth.forEach((shift) => shiftList.append(createShiftCard(shift)));
+  historyItems.forEach((item) => {
+    shiftList.append(
+      item.type === "shift" ? createShiftCard(item.shift) : createDayOffCard(item.date),
+    );
+  });
 
-  const hasShifts = shiftsForMonth.length > 0;
-  shiftList.hidden = !hasShifts;
-  emptyState.hidden = hasShifts;
+  const hasHistoryItems = historyItems.length > 0;
+  shiftList.hidden = !hasHistoryItems;
+  emptyState.hidden = hasHistoryItems;
   shiftCount.textContent = shiftsForMonth.length;
 }
 
@@ -1644,6 +1770,15 @@ shiftActionsOverlay.addEventListener("click", (event) => {
 });
 
 editShiftButton.addEventListener("click", () => {
+  if (selectedDayOffDate) {
+    shiftDateInput.value = selectedDayOffDate;
+    handleSelectedDateChange();
+    closeShiftActions(false);
+    showPage("homePage");
+    selectedDayOffDate = null;
+    return;
+  }
+
   const shift = getSavedShifts().find((item) => item.id === selectedShiftId);
 
   if (!shift) {

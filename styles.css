@@ -878,11 +878,30 @@ h1 {
   transition: transform 160ms ease;
 }
 
-.shift-card:active {
+.day-off-card {
+  width: 100%;
+  padding: 14px 18px;
+  border: 1px solid rgba(31, 35, 40, 0.05);
+  border-radius: var(--radius-medium);
+  color: var(--text-main);
+  font: inherit;
+  text-align: center;
+  background: var(--app-block-background);
+  cursor: pointer;
+  transition: transform 160ms ease;
+}
+
+.day-off-details {
+  text-align: center;
+}
+
+.shift-card:active,
+.day-off-card:active {
   transform: scale(0.985);
 }
 
-.shift-card:focus-visible {
+.shift-card:focus-visible,
+.day-off-card:focus-visible {
   outline: 2px solid rgba(23, 25, 28, 0.35);
   outline-offset: 2px;
 }
@@ -932,6 +951,13 @@ h1 {
   font-size: 0.78rem;
   text-align: center;
   background: rgba(255, 255, 255, 0.38);
+}
+
+.day-off-card__status {
+  margin: -3px 0 0;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  text-align: center;
 }
 
 .empty-state {
@@ -1309,6 +1335,10 @@ body.profile-page-active .bottom-navigation {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
+}
+
+.shift-actions-dialog__buttons--single {
+  grid-template-columns: 1fr;
 }
 
 .edit-shift-button,
