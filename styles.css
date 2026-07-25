@@ -924,6 +924,16 @@ h1 {
   color: var(--text-main);
 }
 
+.shift-card__breaks {
+  margin-top: 2px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  color: rgba(104, 112, 122, 0.88);
+  font-size: 0.78rem;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.38);
+}
+
 .empty-state {
   margin-top: 12px;
   padding: 34px 22px;
@@ -1111,43 +1121,34 @@ body.profile-page-active .bottom-navigation {
 
 .salary-breakdown-row {
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 4px 12px;
+  gap: 5px;
   padding: 11px 13px;
   border: 1px solid rgba(31, 35, 40, 0.06);
   border-radius: 14px;
   color: var(--text-muted);
   font-size: 0.84rem;
+  text-align: center;
   background: var(--app-block-background);
 }
 
-.salary-breakdown-row strong {
+.salary-breakdown-row__label {
   color: var(--text-main);
   font-size: 0.9rem;
-  text-align: right;
 }
 
-.salary-breakdown-row small {
-  grid-column: 1 / -1;
+.salary-breakdown-row__calculation {
   color: rgba(104, 112, 122, 0.78);
   font-size: 0.72rem;
-  text-align: center;
 }
 
 .salary-estimate-total {
   display: grid;
-  gap: 8px;
   margin-top: 16px;
   padding: 17px;
   border-radius: 17px;
   color: #ffffff;
   text-align: center;
   background: var(--button);
-}
-
-.salary-estimate-total span {
-  font-size: 0.76rem;
-  opacity: 0.7;
 }
 
 .salary-estimate-total strong {

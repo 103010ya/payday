@@ -131,7 +131,7 @@ let selectedMonthIndex = 0;
 // Категории оплаты. Ночная надбавка считается отдельно и добавляется сверху.
 const PAY_CATEGORIES = {
   regular: {
-    label: "Обычные часы",
+    label: "Основные",
     multiplier: 1,
   },
   overtime: {
@@ -147,7 +147,7 @@ const PAY_CATEGORIES = {
     multiplier: 2,
   },
   nightPremium: {
-    label: "Ночная надбавка",
+    label: "Ночной бонус",
     multiplier: 0.5,
   },
 };
@@ -906,20 +906,21 @@ function createSalaryBreakdownRow(category, minutes, paySettings) {
   row.className = "salary-breakdown-row";
 
   const label = document.createElement("span");
+  label.className = "salary-breakdown-row__label";
   label.textContent = PAY_CATEGORIES[category].label;
 
-  const value = document.createElement("strong");
-  value.textContent = formatDecimalHours(minutes);
-
-  const rate = document.createElement("small");
+  const calculation = document.createElement("small");
+  calculation.className = "salary-breakdown-row__calculation";
   const multiplier = PAY_CATEGORIES[category].multiplier;
   const hourlyRate = Math.round(
     getRateForCategory(category, paySettings) * multiplier,
   );
 
-  rate.textContent = formatWon(hourlyRate);
+  calculation.textContent = `${formatWon(hourlyRate)} × ${formatDecimalHours(
+    minutes,
+  )}`;
 
-  row.append(label, value, rate);
+  row.append(label, calculation);
   return row;
 }
 
@@ -929,15 +930,14 @@ function createBonusBreakdownRow(bonus) {
   row.className = "salary-breakdown-row";
 
   const label = document.createElement("span");
+  label.className = "salary-breakdown-row__label";
   label.textContent = bonus.label;
 
-  const value = document.createElement("strong");
-  value.textContent = String(bonus.count);
+  const calculation = document.createElement("small");
+  calculation.className = "salary-breakdown-row__calculation";
+  calculation.textContent = `${formatWon(bonus.rate)} × ${bonus.count}`;
 
-  const rate = document.createElement("small");
-  rate.textContent = formatWon(bonus.rate);
-
-  row.append(label, value, rate);
+  row.append(label, calculation);
   return row;
 }
 
@@ -1142,18 +1142,41 @@ function createShiftDetails(shift) {
 
   const startRow = createTimeRow("Начало смены", shift.startTime);
   const endRow = createTimeRow("Конец смены", shift.endTime);
-  const breakMinutes = getShiftBreakMinutes(shift);
+  const breakRow = createBreakSummaryRow(shift);
 
   details.append(startRow, endRow);
 
-  if (breakMinutes > 0) {
-    details.append(
-      createTimeRow("Перерыв", formatHoursAndMinutes(breakMinutes)),
-    );
+  if (breakRow) {
+    details.append(breakRow);
   }
 
   wrapper.append(dateLine, details);
   return wrapper;
+}
+
+// Показывает обед и ужин одной компактной строкой, чтобы карточка не растягивалась.
+function createBreakSummaryRow(shift) {
+  const lunchBreakMinutes = Number(shift.lunchBreakMinutes) || 0;
+  const dinnerBreakMinutes = Number(shift.dinnerBreakMinutes) || 0;
+  const breakParts = [];
+
+  if (lunchBreakMinutes > 0) {
+    breakParts.push(`Обед ${formatBreakDisplay(lunchBreakMinutes)}`);
+  }
+
+  if (dinnerBreakMinutes > 0) {
+    breakParts.push(`Ужин ${formatBreakDisplay(dinnerBreakMinutes)}`);
+  }
+
+  if (breakParts.length === 0) {
+    return null;
+  }
+
+  const row = document.createElement("div");
+  row.className = "shift-card__breaks";
+  row.textContent = breakParts.join(" · ");
+
+  return row;
 }
 
 // Вспомогательная функция для строки «название — время».
