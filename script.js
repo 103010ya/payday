@@ -128,7 +128,7 @@ let selectedBreakMinutes = 0;
 let availableMonthKeys = [];
 let selectedMonthIndex = 0;
 
-// Категории оплаты. Сумма считается как «основная ставка × коэффициент».
+// Категории оплаты. Ночная надбавка считается отдельно и добавляется сверху.
 const PAY_CATEGORIES = {
   regular: {
     label: "Обычные часы",
@@ -146,17 +146,9 @@ const PAY_CATEGORIES = {
     label: "Выходные сверхурочные",
     multiplier: 2,
   },
-  night: {
-    label: "Ночные",
-    multiplier: 1.5,
-  },
-  weekendNight: {
-    label: "Ночные в выходной",
-    multiplier: 2,
-  },
-  nightOvertime: {
-    label: "Ночные сверхурочные",
-    multiplier: 2.5,
+  nightPremium: {
+    label: "Ночная надбавка",
+    multiplier: 0.5,
   },
 };
 
@@ -165,15 +157,14 @@ const PAY_CATEGORY_ORDER = [
   "overtime",
   "weekend",
   "weekendOvertime",
-  "night",
-  "weekendNight",
-  "nightOvertime",
+  "nightPremium",
 ];
 
 const EXTRA_RATE_CATEGORIES = new Set([
   "overtime",
   "weekend",
   "weekendOvertime",
+  "nightPremium",
 ]);
 
 // Основной рабочий блок длится 9 часов по времени на часах.
@@ -592,12 +583,6 @@ function formatWon(amount) {
   return `${new Intl.NumberFormat("ru-RU").format(amount)} ₩`;
 }
 
-function formatMultiplier(multiplier) {
-  return new Intl.NumberFormat("ru-RU", {
-    maximumFractionDigits: 2,
-  }).format(multiplier);
-}
-
 // Превращает длительность перерыва в минуты.
 // Можно вводить «01:00» или просто «60».
 function breakValueToMinutes(value) {
@@ -775,28 +760,13 @@ function isNightMinute(date) {
 }
 
 // Определяет категорию оплаты для одной конкретной оплачиваемой минуты.
-function getPayCategoryForMinute(date, isOvertime) {
-  const isWeekend = isWeekendDate(date);
-  const isNight = isNightMinute(date);
-
-  // Ночная переработка имеет самую высокую ставку.
-  if (isNight && isOvertime) {
-    return "nightOvertime";
-  }
-
-  if (isNight && isWeekend) {
-    return "weekendNight";
-  }
-
-  if (isNight) {
-    return "night";
-  }
-
-  if (isWeekend && isOvertime) {
+// Выходной статус берём от даты начала смены, а не от каждой минуты.
+function getPayCategoryForMinute(isWeekendShift, isOvertime) {
+  if (isWeekendShift && isOvertime) {
     return "weekendOvertime";
   }
 
-  if (isWeekend) {
+  if (isWeekendShift) {
     return "weekend";
   }
 
@@ -813,6 +783,7 @@ function calculateShiftPayBreakdown(shift) {
     PAY_CATEGORY_ORDER.map((category) => [category, 0]),
   );
   const startDateTime = getShiftStartDateTime(shift);
+  const isWeekendShift = isWeekendDate(startDateTime);
   const durationMinutes = getShiftDurationMinutes(shift);
   const lunchBreakMinutes = Number(shift.lunchBreakMinutes) || 0;
   const dinnerBreakMinutes = Number(shift.dinnerBreakMinutes) || 0;
@@ -848,9 +819,15 @@ function calculateShiftPayBreakdown(shift) {
       minuteIndex >= shortLunchOvertimeStartMinute &&
       minuteIndex < overtimeStartMinute;
     const isOvertime = minuteIndex >= overtimeStartMinute || isShortLunchOvertime;
-    const category = getPayCategoryForMinute(currentMinute, isOvertime);
+    const category = getPayCategoryForMinute(isWeekendShift, isOvertime);
 
     breakdown[category] += 1;
+
+    // Ночные часы считаются как надбавка сверху к основной категории.
+    // Например минута может быть обычной и одновременно получить ночную надбавку.
+    if (isNightMinute(currentMinute)) {
+      breakdown.nightPremium += 1;
+    }
   }
 
   return breakdown;
@@ -940,7 +917,7 @@ function createSalaryBreakdownRow(category, minutes, paySettings) {
     getRateForCategory(category, paySettings) * multiplier,
   );
 
-  rate.textContent = `×${formatMultiplier(multiplier)} · ${formatWon(hourlyRate)}`;
+  rate.textContent = formatWon(hourlyRate);
 
   row.append(label, value, rate);
   return row;
