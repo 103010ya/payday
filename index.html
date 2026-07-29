@@ -13,7 +13,7 @@
       content="Мобильное приложение для учёта рабочих смен"
     />
     <title>Учёт смен</title>
-    <link rel="stylesheet" href="styles.css?v=20260726-2" />
+    <link rel="stylesheet" href="styles.css?v=20260729-1" />
   </head>
 
   <body class="home-page-active">
@@ -35,6 +35,15 @@
             <svg viewBox="0 0 24 24">
               <path d="M12 7v5l3.5 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
             </svg>
+          </button>
+
+          <button
+            id="languageToggleButton"
+            class="language-toggle"
+            type="button"
+            aria-label="Переключить язык"
+          >
+            한국어
           </button>
 
           <form id="shiftForm" class="shift-form">
@@ -132,7 +141,7 @@
 
             <div class="break-fields">
               <div class="field">
-                <span class="break-field-label">Обед</span>
+                <span class="break-field-label" data-i18n="lunch">Обед</span>
                 <!-- Скрытое поле хранит длительность обеда в минутах -->
                 <input id="lunchBreak" name="lunchBreak" type="hidden" value="60" />
                 <button
@@ -148,7 +157,7 @@
               </div>
 
               <div class="field">
-                <span class="break-field-label">Ужин</span>
+                <span class="break-field-label" data-i18n="dinner">Ужин</span>
                 <!-- Скрытое поле хранит длительность ужина в минутах -->
                 <input id="dinnerBreak" name="dinnerBreak" type="hidden" value="0" />
                 <button
@@ -164,7 +173,7 @@
               </div>
             </div>
 
-            <button id="saveButton" class="save-button" type="submit">
+            <button id="saveButton" class="save-button" type="submit" data-i18n="save">
               Сохранить
             </button>
           </form>
@@ -188,7 +197,7 @@
         >
           <div class="calendar-heading">
             <div class="calendar-heading__title">
-              <h1 id="historyTitle">История</h1>
+              <h1 id="historyTitle" data-i18n="history">История</h1>
             </div>
             <div class="history-actions">
               <button
@@ -251,7 +260,7 @@
 
             <div id="emptyState" class="empty-state" hidden>
               <div class="empty-state__icon" aria-hidden="true">—</div>
-              <p>Нет сохранённых смен за этот месяц</p>
+              <p data-i18n="emptyMonth">Нет сохранённых смен за этот месяц</p>
             </div>
           </div>
         </section>
@@ -277,8 +286,10 @@
             </button>
 
             <div class="profile-page__title">
-              <p class="profile-page__eyebrow">Облачное сохранение</p>
-              <h1 id="profileTitle">Профиль</h1>
+              <p class="profile-page__eyebrow" data-i18n="cloudSave">
+                Облачное сохранение
+              </p>
+              <h1 id="profileTitle" data-i18n="profile">Профиль</h1>
             </div>
           </div>
 
@@ -293,7 +304,7 @@
                   aria-selected="true"
                   aria-controls="loginForm"
                 >
-                  Вход
+                  <span data-i18n="loginTab">Вход</span>
                 </button>
                 <button
                   id="registerTabButton"
@@ -303,13 +314,13 @@
                   aria-selected="false"
                   aria-controls="registerForm"
                 >
-                  Регистрация
+                  <span data-i18n="registerTab">Регистрация</span>
                 </button>
               </div>
 
               <form id="loginForm" class="auth-form" autocomplete="on">
                 <label class="auth-field">
-                  <span>Email</span>
+                  <span data-i18n="email">Email</span>
                   <input
                     type="email"
                     name="username"
@@ -322,23 +333,26 @@
                 </label>
 
                 <label class="auth-field">
-                  <span>Пароль</span>
+                  <span data-i18n="password">Пароль</span>
                   <input
                     type="password"
                     name="password"
                     autocomplete="current-password"
                     placeholder="Введите пароль"
+                    data-i18n-placeholder="passwordPlaceholder"
                     required
                   />
                 </label>
 
-                <button class="auth-submit-button" type="submit">Войти</button>
+                <button class="auth-submit-button" type="submit" data-i18n="login">
+                  Войти
+                </button>
                 <button
                   id="forgotPasswordButton"
                   class="forgot-password-button"
                   type="button"
                 >
-                  Забыли пароль?
+                  <span data-i18n="forgotPassword">Забыли пароль?</span>
                 </button>
               </form>
 
@@ -349,18 +363,19 @@
                 hidden
               >
                 <label class="auth-field">
-                  <span>Имя</span>
+                  <span data-i18n="name">Имя</span>
                   <input
                     type="text"
                     name="name"
                     autocomplete="name"
                     placeholder="Ваше имя"
+                    data-i18n-placeholder="namePlaceholder"
                     required
                   />
                 </label>
 
                 <label class="auth-field">
-                  <span>Email</span>
+                  <span data-i18n="email">Email</span>
                   <input
                     type="email"
                     name="email"
@@ -373,18 +388,19 @@
                 </label>
 
                 <label class="auth-field">
-                  <span>Пароль</span>
+                  <span data-i18n="password">Пароль</span>
                   <input
                     type="password"
                     name="new-password"
                     autocomplete="new-password"
                     minlength="6"
                     placeholder="Минимум 6 символов"
+                    data-i18n-placeholder="newPasswordPlaceholder"
                     required
                   />
                 </label>
 
-                <button class="auth-submit-button" type="submit">
+                <button class="auth-submit-button" type="submit" data-i18n="createProfile">
                   Создать профиль
                 </button>
               </form>
@@ -400,14 +416,21 @@
               <p id="accountEmail" class="account-email"></p>
               <div class="account-sync-status">
                 <span class="account-sync-status__dot"></span>
-                <span id="accountSyncText">Данные синхронизированы</span>
+                <span id="accountSyncText" data-sync-status="synced">
+                  Данные синхронизированы
+                </span>
               </div>
-              <button id="logoutButton" class="logout-button" type="button">
+              <button id="logoutButton" class="logout-button" type="button" data-i18n="logout">
                 Выйти из профиля
               </button>
             </div>
 
-            <p id="authPreviewMessage" class="auth-preview-message" role="status">
+            <p
+              id="authPreviewMessage"
+              class="auth-preview-message"
+              role="status"
+              data-auth-message="firebasePending"
+            >
               Подключение Firebase ожидает настройки
             </p>
           </div>
@@ -427,7 +450,7 @@
               <path d="M3 10.8 12 3l9 7.8v9.7a.5.5 0 0 1-.5.5h-5.7v-6.2H9.2V21H3.5a.5.5 0 0 1-.5-.5v-9.7Z" />
             </svg>
           </span>
-          <span>Главная</span>
+          <span data-i18n="home">Главная</span>
         </button>
 
         <button class="nav-button" type="button" data-page="calendarPage">
@@ -436,7 +459,7 @@
               <path d="M6.5 2v3M17.5 2v3M3.5 8.5h17M5 4h14a1.5 1.5 0 0 1 1.5 1.5v14A1.5 1.5 0 0 1 19 21H5a1.5 1.5 0 0 1-1.5-1.5v-14A1.5 1.5 0 0 1 5 4Z" />
             </svg>
           </span>
-          <span>История</span>
+          <span data-i18n="history">История</span>
         </button>
       </nav>
     </div>
@@ -476,18 +499,18 @@
         </div>
 
         <div class="weekdays" aria-hidden="true">
-          <span>Пн</span>
-          <span>Вт</span>
-          <span>Ср</span>
-          <span>Чт</span>
-          <span>Пт</span>
-          <span>Сб</span>
-          <span>Вс</span>
+          <span data-weekday-index="0">Пн</span>
+          <span data-weekday-index="1">Вт</span>
+          <span data-weekday-index="2">Ср</span>
+          <span data-weekday-index="3">Чт</span>
+          <span data-weekday-index="4">Пт</span>
+          <span data-weekday-index="5">Сб</span>
+          <span data-weekday-index="6">Вс</span>
         </div>
 
         <div id="calendarDays" class="calendar-days"></div>
 
-        <button id="todayButton" class="today-button" type="button">
+        <button id="todayButton" class="today-button" type="button" data-i18n="today">
           Выбрать сегодня
         </button>
       </div>
@@ -504,10 +527,10 @@
         <div id="shiftActionsDetails" class="shift-actions-dialog__details"></div>
 
         <div class="shift-actions-dialog__buttons">
-          <button id="editShiftButton" class="edit-shift-button" type="button">
+          <button id="editShiftButton" class="edit-shift-button" type="button" data-i18n="edit">
             Изменить
           </button>
-          <button id="deleteShiftButton" class="delete-shift-button" type="button">
+          <button id="deleteShiftButton" class="delete-shift-button" type="button" data-i18n="delete">
             Удалить
           </button>
         </div>
@@ -542,11 +565,11 @@
         aria-modal="true"
         aria-label="Настройки расчёта зарплаты"
       >
-        <p class="salary-estimate-dialog__caption">Настройки</p>
+        <p class="salary-estimate-dialog__caption" data-i18n="settings">Настройки</p>
 
         <div class="pay-settings-fields">
           <label class="base-rate-field" for="baseRateInput">
-            <span>Основная ставка</span>
+            <span data-i18n="baseRate">Основная ставка</span>
             <input
               id="baseRateInput"
               type="number"
@@ -558,7 +581,7 @@
           </label>
 
           <label class="base-rate-field" for="extraRateInput">
-            <span>Дополнительная ставка</span>
+            <span data-i18n="extraRate">Дополнительная ставка</span>
             <input
               id="extraRateInput"
               type="number"
@@ -569,10 +592,30 @@
             />
           </label>
 
-          <label class="base-rate-field" for="monthlyBonusInput">
-            <span>Месячный бонус</span>
+          <label class="auto-rate-field" for="autoExtraRateInput">
+            <input id="autoExtraRateInput" type="checkbox" />
+            <span data-i18n="autoExtraRate">Авторасчёт дополнительной ставки</span>
+          </label>
+
+          <label
+            class="base-rate-field attendance-allowance-field"
+            for="attendanceAllowanceInput"
+          >
+            <span data-i18n="attendanceAllowance">Бонус за посещаемость</span>
             <input
-              id="monthlyBonusInput"
+              id="attendanceAllowanceInput"
+              type="number"
+              inputmode="numeric"
+              min="0"
+              step="10"
+              value="0"
+            />
+          </label>
+
+          <label class="base-rate-field" for="dailyBonusInput">
+            <span data-i18n="bonusDaily">Ежедневный бонус</span>
+            <input
+              id="dailyBonusInput"
               type="number"
               inputmode="numeric"
               min="0"
@@ -582,7 +625,7 @@
           </label>
 
           <label class="base-rate-field" for="weeklyBonusInput">
-            <span>Недельный бонус</span>
+            <span data-i18n="bonusWeekly">Недельный бонус</span>
             <input
               id="weeklyBonusInput"
               type="number"
@@ -593,14 +636,26 @@
             />
           </label>
 
-          <label class="base-rate-field" for="dailyBonusInput">
-            <span>Ежедневный бонус</span>
+          <label class="base-rate-field" for="monthlyBonusInput">
+            <span data-i18n="bonusMonthly">Месячный бонус</span>
             <input
-              id="dailyBonusInput"
+              id="monthlyBonusInput"
               type="number"
               inputmode="numeric"
               min="0"
               step="1000"
+              value="0"
+            />
+          </label>
+
+          <label class="base-rate-field" for="jobAllowanceInput">
+            <span data-i18n="jobAllowance">Бонус за должность</span>
+            <input
+              id="jobAllowanceInput"
+              type="number"
+              inputmode="numeric"
+              min="0"
+              step="10"
               value="0"
             />
           </label>
@@ -618,7 +673,7 @@
       >
         <div class="time-stepper">
           <div class="time-stepper__column">
-            <span class="time-stepper__label">Часы</span>
+            <span class="time-stepper__label" data-i18n="hours">Часы</span>
             <button
               id="increaseHourButton"
               class="time-stepper__arrow"
@@ -645,7 +700,7 @@
           <span class="time-stepper__separator" aria-hidden="true">:</span>
 
           <div class="time-stepper__column">
-            <span class="time-stepper__label">Минуты</span>
+            <span class="time-stepper__label" data-i18n="minutes">Минуты</span>
             <button
               id="increaseMinuteButton"
               class="time-stepper__arrow"
@@ -670,7 +725,7 @@
           </div>
         </div>
 
-        <button id="confirmTimeButton" class="confirm-time-button" type="button">
+        <button id="confirmTimeButton" class="confirm-time-button" type="button" data-i18n="done">
           Готово
         </button>
       </div>
@@ -685,7 +740,7 @@
         aria-label="Выбор длительности перерыва"
       >
         <div class="break-stepper">
-          <span class="time-stepper__label">Минуты</span>
+          <span class="time-stepper__label" data-i18n="minutes">Минуты</span>
           <button
             id="increaseBreakButton"
             class="time-stepper__arrow"
@@ -709,12 +764,12 @@
           </button>
         </div>
 
-        <button id="confirmBreakButton" class="confirm-time-button" type="button">
+        <button id="confirmBreakButton" class="confirm-time-button" type="button" data-i18n="done">
           Готово
         </button>
       </div>
     </div>
 
-    <script type="module" src="script.js?v=20260726-2"></script>
+    <script type="module" src="script.js?v=20260729-1"></script>
   </body>
 </html>

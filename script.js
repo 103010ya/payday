@@ -19,13 +19,20 @@ const LAST_TIME_KEY = "paydayLastShiftTime";
 // Базовая ставка за час для расчёта зарплаты.
 const BASE_RATE_KEY = "paydayBaseRate";
 const EXTRA_RATE_KEY = "paydayExtraRate";
+const AUTO_EXTRA_RATE_KEY = "paydayAutoExtraRate";
+const JOB_ALLOWANCE_KEY = "paydayJobAllowance";
+const ATTENDANCE_ALLOWANCE_KEY = "paydayAttendanceAllowance";
 const MONTHLY_BONUS_KEY = "paydayMonthlyBonus";
 const WEEKLY_BONUS_KEY = "paydayWeeklyBonus";
 const DAILY_BONUS_KEY = "paydayDailyBonus";
+const PAY_SETTINGS_MONTH_PREFIX = "paydayPaySettings:";
+const LANGUAGE_KEY = "paydayLanguage";
+const DEFAULT_LANGUAGE = "ru";
 
 // Получаем нужные элементы страницы один раз при запуске приложения.
 const shiftForm = document.querySelector("#shiftForm");
 const profileButton = document.querySelector("#profileButton");
+const languageToggleButton = document.querySelector("#languageToggleButton");
 const closeProfileButton = document.querySelector("#closeProfileButton");
 const loginTabButton = document.querySelector("#loginTabButton");
 const registerTabButton = document.querySelector("#registerTabButton");
@@ -99,6 +106,9 @@ const paySettingsOverlay = document.querySelector("#paySettingsOverlay");
 const salaryEstimateMonth = document.querySelector("#salaryEstimateMonth");
 const baseRateInput = document.querySelector("#baseRateInput");
 const extraRateInput = document.querySelector("#extraRateInput");
+const autoExtraRateInput = document.querySelector("#autoExtraRateInput");
+const jobAllowanceInput = document.querySelector("#jobAllowanceInput");
+const attendanceAllowanceInput = document.querySelector("#attendanceAllowanceInput");
 const monthlyBonusInput = document.querySelector("#monthlyBonusInput");
 const weeklyBonusInput = document.querySelector("#weeklyBonusInput");
 const dailyBonusInput = document.querySelector("#dailyBonusInput");
@@ -111,10 +121,19 @@ const shiftCount = document.querySelector("#shiftCount");
 const paySettingsButton = document.querySelector("#paySettingsButton");
 const navigationButtons = document.querySelectorAll(".nav-button");
 const pages = document.querySelectorAll(".page");
+const translatedElements = document.querySelectorAll("[data-i18n]");
+const translatedPlaceholderElements = document.querySelectorAll(
+  "[data-i18n-placeholder]",
+);
+const calendarWeekdayItems = document.querySelectorAll("[data-weekday-index]");
 
 let messageTimer;
 let activePageId = "homePage";
 let currentUser = null;
+let currentLanguage = localStorage.getItem(LANGUAGE_KEY) || DEFAULT_LANGUAGE;
+if (!["ru", "ko"].includes(currentLanguage)) {
+  currentLanguage = DEFAULT_LANGUAGE;
+}
 let activeStorageUserId = localStorage.getItem(LAST_USER_KEY) || null;
 let visibleCalendarMonth = new Date();
 let selectedShiftId = null;
@@ -129,26 +148,239 @@ let selectedBreakMinutes = 0;
 let availableMonthKeys = [];
 let selectedMonthIndex = 0;
 
+// Тексты интерфейса. Данные смен не переводятся и не меняются.
+const TRANSLATIONS = {
+  ru: {
+    code: "ru-RU",
+    htmlLang: "ru",
+    nextLanguageLabel: "한국어",
+    weekdays: ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"],
+    home: "Главная",
+    history: "История",
+    save: "Сохранить",
+    saveChanges: "Сохранить изменения",
+    lunch: "Обед",
+    dinner: "Ужин",
+    hours: "Часы",
+    minutes: "Минуты",
+    minuteShort: "мин",
+    today: "Сегодня",
+    done: "Готово",
+    edit: "Изменить",
+    delete: "Удалить",
+    startShift: "Начало смены",
+    endShift: "Конец смены",
+    dayOff: "Выходной",
+    payRegular: "Основные",
+    payOvertime: "Сверхурочные",
+    payWeekend: "Выходные",
+    payWeekendOvertime: "Выходные сверхурочные",
+    payNightPremium: "Ночной бонус",
+    bonusDaily: "Ежедневный бонус",
+    bonusWeekly: "Недельный бонус",
+    bonusMonthly: "Месячный бонус",
+    settings: "Настройки",
+    baseRate: "Основная ставка",
+    extraRate: "Дополнительная ставка",
+    autoExtraRate: "Авторасчёт дополнительной ставки",
+    jobAllowance: "Бонус за должность",
+    attendanceAllowance: "Бонус за посещаемость",
+    cloudSave: "Облачное сохранение",
+    profile: "Профиль",
+    loginTab: "Вход",
+    registerTab: "Регистрация",
+    email: "Email",
+    password: "Пароль",
+    name: "Имя",
+    login: "Войти",
+    createProfile: "Создать профиль",
+    forgotPassword: "Забыли пароль?",
+    logout: "Выйти из профиля",
+    user: "Пользователь",
+    passwordPlaceholder: "Введите пароль",
+    namePlaceholder: "Ваше имя",
+    newPasswordPlaceholder: "Минимум 6 символов",
+    wait: "Подождите…",
+    firebasePending: "Подключение Firebase ожидает настройки",
+    firebaseMissing: "Сначала добавьте конфигурацию Firebase",
+    emailFirst: "Сначала введите email",
+    resetEmailSent: "Письмо для восстановления отправлено",
+    logoutFailed: "Не удалось выйти из профиля",
+    syncing: "Синхронизация данных…",
+    synced: "Данные синхронизированы",
+    savedOnDevice: "Сохранено на устройстве",
+    deletedOnDevice: "Удалено только на устройстве",
+    cloudLoadFailed: "Не удалось загрузить облачные данные",
+    emailAlreadyInUse: "Профиль с таким email уже существует",
+    invalidCredential: "Неверный email или пароль",
+    invalidEmail: "Проверьте правильность email",
+    missingPassword: "Введите пароль",
+    authNotAllowed: "Включите Email/Password в настройках Firebase Authentication",
+    weakPassword: "Пароль должен содержать минимум 6 символов",
+    tooManyRequests: "Слишком много попыток. Попробуйте позже",
+    networkFailed: "Нет соединения с интернетом",
+    authOperationFailed: "Не удалось выполнить операцию",
+    emptyMonth: "Нет сохранённых смен за этот месяц",
+    chooseShiftTime: "Выберите начало и конец смены",
+    chooseBreakAgain: "Выберите перерыв заново",
+    breaksLongerThanShift: "Перерывы больше смены",
+  },
+  ko: {
+    code: "ko-KR",
+    htmlLang: "ko",
+    nextLanguageLabel: "Русский",
+    weekdays: ["월", "화", "수", "목", "금", "토", "일"],
+    home: "홈",
+    history: "기록",
+    save: "저장",
+    saveChanges: "수정 저장",
+    lunch: "점심",
+    dinner: "저녁",
+    hours: "시간",
+    minutes: "분",
+    minuteShort: "분",
+    today: "오늘",
+    done: "완료",
+    edit: "수정",
+    delete: "삭제",
+    startShift: "출근",
+    endShift: "퇴근",
+    dayOff: "휴무",
+    payRegular: "기본급",
+    payOvertime: "연장근로",
+    payWeekend: "특근수당",
+    payWeekendOvertime: "휴일연장수당",
+    payNightPremium: "야간근로수당",
+    bonusDaily: "생산장려수당",
+    bonusWeekly: "주휴수당",
+    bonusMonthly: "만근수당",
+    settings: "설정",
+    baseRate: "시급",
+    extraRate: "통상시급",
+    autoExtraRate: "통상시급 자동 계산",
+    jobAllowance: "직무수당",
+    attendanceAllowance: "출근수당",
+    cloudSave: "클라우드 저장",
+    profile: "프로필",
+    loginTab: "로그인",
+    registerTab: "가입",
+    email: "이메일",
+    password: "비밀번호",
+    name: "이름",
+    login: "로그인",
+    createProfile: "프로필 만들기",
+    forgotPassword: "비밀번호를 잊으셨나요?",
+    logout: "로그아웃",
+    user: "사용자",
+    passwordPlaceholder: "비밀번호 입력",
+    namePlaceholder: "이름 입력",
+    newPasswordPlaceholder: "최소 6자",
+    wait: "잠시만요…",
+    firebasePending: "Firebase 설정을 기다리는 중",
+    firebaseMissing: "Firebase 설정을 먼저 추가하세요",
+    emailFirst: "이메일을 먼저 입력하세요",
+    resetEmailSent: "비밀번호 재설정 이메일을 보냈습니다",
+    logoutFailed: "로그아웃하지 못했습니다",
+    syncing: "데이터 동기화 중…",
+    synced: "데이터 동기화 완료",
+    savedOnDevice: "기기에 저장됨",
+    deletedOnDevice: "기기에서만 삭제됨",
+    cloudLoadFailed: "클라우드 데이터를 불러오지 못했습니다",
+    emailAlreadyInUse: "이미 사용 중인 이메일입니다",
+    invalidCredential: "이메일 또는 비밀번호가 올바르지 않습니다",
+    invalidEmail: "이메일 형식을 확인하세요",
+    missingPassword: "비밀번호를 입력하세요",
+    authNotAllowed: "Firebase Authentication에서 Email/Password를 켜세요",
+    weakPassword: "비밀번호는 최소 6자 이상이어야 합니다",
+    tooManyRequests: "시도가 너무 많습니다. 나중에 다시 시도하세요",
+    networkFailed: "인터넷 연결이 없습니다",
+    authOperationFailed: "작업을 완료하지 못했습니다",
+    emptyMonth: "이번 달 저장된 근무가 없습니다",
+    chooseShiftTime: "출근과 퇴근 시간을 선택하세요",
+    chooseBreakAgain: "휴식 시간을 다시 선택하세요",
+    breaksLongerThanShift: "휴식 시간이 근무 시간보다 깁니다",
+  },
+};
+
+function getLanguageConfig() {
+  return TRANSLATIONS[currentLanguage] || TRANSLATIONS[DEFAULT_LANGUAGE];
+}
+
+function t(key) {
+  return getLanguageConfig()[key] || TRANSLATIONS[DEFAULT_LANGUAGE][key] || key;
+}
+
+// Применяет выбранный язык ко всем статичным и динамическим частям главной/истории.
+function applyLanguage() {
+  document.documentElement.lang = getLanguageConfig().htmlLang;
+
+  translatedElements.forEach((element) => {
+    element.textContent = t(element.dataset.i18n);
+  });
+
+  translatedPlaceholderElements.forEach((element) => {
+    element.placeholder = t(element.dataset.i18nPlaceholder);
+  });
+
+  calendarWeekdayItems.forEach((element) => {
+    const weekdayIndex = Number(element.dataset.weekdayIndex);
+    element.textContent = getLanguageConfig().weekdays[weekdayIndex];
+  });
+
+  languageToggleButton.textContent = t("nextLanguageLabel");
+  languageToggleButton.setAttribute(
+    "aria-label",
+    currentLanguage === "ru" ? "Переключить на корейский" : "러시아어로 전환",
+  );
+  saveButton.textContent = editingShiftId ? t("saveChanges") : t("save");
+  accountName.textContent = accountName.dataset.fallbackUser === "true"
+    ? t("user")
+    : accountName.textContent;
+
+  if (accountSyncText.dataset.syncStatus) {
+    accountSyncText.textContent = t(accountSyncText.dataset.syncStatus);
+  }
+
+  if (authPreviewMessage.dataset.authMessage) {
+    authPreviewMessage.textContent = t(authPreviewMessage.dataset.authMessage);
+  }
+
+  updateSelectedDateText();
+  renderDatePicker();
+  renderMonthOptions(monthSelect.value);
+  renderShifts();
+
+  if (!salaryEstimateOverlay.hidden) {
+    renderSalaryEstimate();
+  }
+}
+
+function toggleLanguage() {
+  currentLanguage = currentLanguage === "ru" ? "ko" : "ru";
+  localStorage.setItem(LANGUAGE_KEY, currentLanguage);
+  applyLanguage();
+}
+
 // Категории оплаты. Ночная надбавка считается отдельно и добавляется сверху.
 const PAY_CATEGORIES = {
   regular: {
-    label: "Основные",
+    labelKey: "payRegular",
     multiplier: 1,
   },
   overtime: {
-    label: "Сверхурочные",
+    labelKey: "payOvertime",
     multiplier: 1.5,
   },
   weekend: {
-    label: "Выходные",
+    labelKey: "payWeekend",
     multiplier: 1.5,
   },
   weekendOvertime: {
-    label: "Выходные сверхурочные",
+    labelKey: "payWeekendOvertime",
     multiplier: 2,
   },
   nightPremium: {
-    label: "Ночной бонус",
+    labelKey: "payNightPremium",
     multiplier: 0.5,
   },
 };
@@ -226,12 +458,7 @@ function renderDatePicker() {
   const selectedDateValue = shiftDateInput.value;
   const todayValue = getTodayValue();
 
-  datePickerTitle.textContent = new Intl.DateTimeFormat("ru-RU", {
-    month: "long",
-    year: "numeric",
-  })
-    .format(firstDay)
-    .replace(/\s*г\.$/, "");
+  datePickerTitle.textContent = formatMonthName(dateToInputValue(firstDay).slice(0, 7));
 
   calendarDays.replaceChildren();
 
@@ -249,7 +476,7 @@ function renderDatePicker() {
     dayButton.textContent = dayDate.getDate();
     dayButton.setAttribute(
       "aria-label",
-      new Intl.DateTimeFormat("ru-RU", {
+      new Intl.DateTimeFormat(getLanguageConfig().code, {
         day: "numeric",
         month: "long",
         year: "numeric",
@@ -516,18 +743,20 @@ function getCompletedWeekCount(monthKey, fullWorkdayDates) {
   ).length;
 }
 
-// Превращает YYYY-MM в понятное русское название, например «Июнь 2026».
+// Превращает YYYY-MM в понятное название месяца на выбранном языке.
 function formatMonthName(monthKey) {
   const [year, month] = monthKey.split("-").map(Number);
   const date = new Date(year, month - 1, 1);
-  const monthName = new Intl.DateTimeFormat("ru-RU", {
+  const monthName = new Intl.DateTimeFormat(getLanguageConfig().code, {
     month: "long",
     year: "numeric",
   })
     .format(date)
     .replace(/\s*г\.$/, "");
 
-  return monthName.charAt(0).toUpperCase() + monthName.slice(1);
+  return currentLanguage === "ru"
+    ? monthName.charAt(0).toUpperCase() + monthName.slice(1)
+    : monthName;
 }
 
 // Преобразует дату из YYYY-MM-DD в требуемый вид YYYY/MM/DD.
@@ -537,13 +766,15 @@ function formatShiftDate(dateValue) {
 
 // Показывает короткий день недели для карточки смены.
 function formatShortWeekday(dateValue) {
-  const weekday = new Intl.DateTimeFormat("ru-RU", {
+  const weekday = new Intl.DateTimeFormat(getLanguageConfig().code, {
     weekday: "short",
   })
     .format(inputValueToDate(dateValue))
     .replace(".", "");
 
-  return weekday.charAt(0).toUpperCase() + weekday.slice(1);
+  return currentLanguage === "ru"
+    ? weekday.charAt(0).toUpperCase() + weekday.slice(1)
+    : weekday;
 }
 
 // Переводит время HH:MM в количество минут от начала суток.
@@ -623,7 +854,7 @@ function breakValueToMinutes(value) {
 function formatBreakDisplay(totalMinutes) {
   const safeMinutes = Math.max(0, Number(totalMinutes) || 0);
 
-  return `${safeMinutes} мин`;
+  return `${safeMinutes} ${t("minuteShort")}`;
 }
 
 function setBreakValue(fieldName, minutes) {
@@ -672,7 +903,7 @@ function applyShiftForSelectedDate() {
   setTimeValue("end", savedShift.endTime);
   setBreakValue("lunch", savedShift.lunchBreakMinutes || 0);
   setBreakValue("dinner", savedShift.dinnerBreakMinutes || 0);
-  saveButton.textContent = "Сохранить изменения";
+  saveButton.textContent = t("saveChanges");
 }
 
 // Общее действие после смены даты: обновить текст и проверить сохранённую смену.
@@ -700,37 +931,195 @@ function getExtraRate(baseRate = getBaseRate()) {
   return savedRate > 0 ? savedRate : baseRate;
 }
 
-function getMoneySetting(key, fallback = 0) {
+function getOptionalMoneySetting(key) {
   const savedValue = Number(localStorage.getItem(key));
 
-  return savedValue > 0 ? savedValue : fallback;
+  return savedValue > 0 ? savedValue : 0;
 }
 
-function setMoneySetting(key, input, fallback = 0) {
-  const safeValue = Math.max(0, Number(input.value) || 0);
-  const valueToSave = safeValue || fallback;
-
-  localStorage.setItem(key, String(valueToSave));
-  input.value = String(valueToSave);
+function isAutoExtraRateEnabled() {
+  return localStorage.getItem(AUTO_EXTRA_RATE_KEY) === "true";
 }
 
-function getPaySettings() {
+function calculateAutoExtraRate(
+  baseRate,
+  jobAllowance,
+  dailyBonus,
+  fullWorkdayCount,
+  monthlyBonus,
+) {
+  const attendanceAllowance = dailyBonus * fullWorkdayCount;
+
+  return Math.round(
+    baseRate + (jobAllowance + attendanceAllowance + monthlyBonus) / 209,
+  );
+}
+
+function getFullWorkdayCountForMonth(monthKey) {
+  if (!monthKey) {
+    return 0;
+  }
+
+  return getSavedShifts().filter(
+    (shift) =>
+      getMonthKey(shift.date) === monthKey && isFullWorkdayShift(shift),
+  ).length;
+}
+
+function getSelectedMonthFullWorkdayCount() {
+  return getFullWorkdayCountForMonth(monthSelect.value || getMonthKey(getTodayValue()));
+}
+
+function getPaySettingsStorageKey(monthKey) {
+  return `${PAY_SETTINGS_MONTH_PREFIX}${monthKey}`;
+}
+
+function getLegacyPaySettings() {
   const baseRate = getBaseRate();
 
   return {
     baseRate,
-    extraRate: getExtraRate(baseRate),
+    manualExtraRate: getExtraRate(baseRate),
+    isAutoExtraRate: isAutoExtraRateEnabled(),
+    jobAllowance: getOptionalMoneySetting(JOB_ALLOWANCE_KEY),
+    manualAttendanceAllowance: getOptionalMoneySetting(ATTENDANCE_ALLOWANCE_KEY),
     monthlyBonus: getMoneySetting(MONTHLY_BONUS_KEY),
     weeklyBonus: getMoneySetting(WEEKLY_BONUS_KEY),
     dailyBonus: getMoneySetting(DAILY_BONUS_KEY),
   };
 }
 
-function updatePaySettingsInputs() {
-  const settings = getPaySettings();
+function normalizePaySettings(settings = {}) {
+  const legacySettings = getLegacyPaySettings();
+  const baseRate = Number(settings.baseRate) || legacySettings.baseRate;
+  const manualExtraRate =
+    Number(settings.manualExtraRate) ||
+    Number(settings.extraRate) ||
+    legacySettings.manualExtraRate ||
+    baseRate;
+
+  return {
+    baseRate,
+    manualExtraRate,
+    isAutoExtraRate: Boolean(settings.isAutoExtraRate),
+    jobAllowance: Math.max(0, Number(settings.jobAllowance) || 0),
+    manualAttendanceAllowance: Math.max(
+      0,
+      Number(settings.manualAttendanceAllowance ?? settings.attendanceAllowance) || 0,
+    ),
+    monthlyBonus: Math.max(0, Number(settings.monthlyBonus) || 0),
+    weeklyBonus: Math.max(0, Number(settings.weeklyBonus) || 0),
+    dailyBonus: Math.max(0, Number(settings.dailyBonus) || 0),
+  };
+}
+
+function getSavedPaySettingsMonthKeys() {
+  return Object.keys(localStorage)
+    .filter((key) => key.startsWith(PAY_SETTINGS_MONTH_PREFIX))
+    .map((key) => key.replace(PAY_SETTINGS_MONTH_PREFIX, ""))
+    .sort((firstMonth, secondMonth) => secondMonth.localeCompare(firstMonth));
+}
+
+function getFallbackPaySettings(monthKey) {
+  const savedMonthKeys = getSavedPaySettingsMonthKeys();
+  const previousOrCurrentMonth = savedMonthKeys.find(
+    (savedMonthKey) => savedMonthKey <= monthKey,
+  );
+  const fallbackMonth = previousOrCurrentMonth || savedMonthKeys[0];
+
+  if (fallbackMonth) {
+    try {
+      return normalizePaySettings(
+        JSON.parse(localStorage.getItem(getPaySettingsStorageKey(fallbackMonth))),
+      );
+    } catch (error) {
+      console.error("Не удалось прочитать настройки зарплаты:", error);
+    }
+  }
+
+  return normalizePaySettings(getLegacyPaySettings());
+}
+
+function loadMonthPaySettings(monthKey = monthSelect.value || getMonthKey(getTodayValue())) {
+  try {
+    const savedSettings = JSON.parse(
+      localStorage.getItem(getPaySettingsStorageKey(monthKey)),
+    );
+
+    if (savedSettings) {
+      return normalizePaySettings(savedSettings);
+    }
+  } catch (error) {
+    console.error("Не удалось прочитать настройки месяца:", error);
+  }
+
+  return getFallbackPaySettings(monthKey);
+}
+
+function saveMonthPaySettings(monthKey, settings) {
+  localStorage.setItem(
+    getPaySettingsStorageKey(monthKey),
+    JSON.stringify(normalizePaySettings(settings)),
+  );
+}
+
+function getMoneySetting(key, fallback = 0) {
+  const savedValue = Number(localStorage.getItem(key));
+
+  return savedValue > 0 ? savedValue : fallback;
+}
+
+function getPaySettings(monthKey = monthSelect.value || getMonthKey(getTodayValue())) {
+  const monthSettings = loadMonthPaySettings(monthKey);
+  const baseRate = monthSettings.baseRate;
+  const jobAllowance = monthSettings.jobAllowance;
+  const monthlyBonus = monthSettings.monthlyBonus;
+  const weeklyBonus = monthSettings.weeklyBonus;
+  const dailyBonus = monthSettings.dailyBonus;
+  const manualAttendanceAllowance = monthSettings.manualAttendanceAllowance;
+  const isAutoExtraRate = monthSettings.isAutoExtraRate;
+  const fullWorkdayCount = getFullWorkdayCountForMonth(monthKey);
+  const autoAttendanceAllowance = dailyBonus * fullWorkdayCount;
+  const extraRate = isAutoExtraRate
+    ? calculateAutoExtraRate(
+        baseRate,
+        jobAllowance,
+        dailyBonus,
+        fullWorkdayCount,
+        monthlyBonus,
+      )
+    : monthSettings.manualExtraRate;
+
+  return {
+    baseRate,
+    extraRate,
+    manualExtraRate: monthSettings.manualExtraRate,
+    isAutoExtraRate,
+    jobAllowance,
+    attendanceAllowance: isAutoExtraRate
+      ? autoAttendanceAllowance
+      : manualAttendanceAllowance,
+    manualAttendanceAllowance,
+    fullWorkdayCount,
+    monthlyBonus,
+    weeklyBonus,
+    dailyBonus,
+  };
+}
+
+function updatePaySettingsInputs(monthKey = monthSelect.value || getMonthKey(getTodayValue())) {
+  const settings = getPaySettings(monthKey);
 
   baseRateInput.value = String(settings.baseRate);
+  autoExtraRateInput.checked = settings.isAutoExtraRate;
   extraRateInput.value = String(settings.extraRate);
+  extraRateInput.disabled = settings.isAutoExtraRate;
+  jobAllowanceInput.value = String(settings.jobAllowance);
+  attendanceAllowanceInput.value = String(settings.manualAttendanceAllowance);
+  attendanceAllowanceInput.closest(".attendance-allowance-field")?.classList.toggle(
+    "base-rate-field--hidden",
+    settings.isAutoExtraRate,
+  );
   monthlyBonusInput.value = String(settings.monthlyBonus);
   weeklyBonusInput.value = String(settings.weeklyBonus);
   dailyBonusInput.value = String(settings.dailyBonus);
@@ -853,10 +1242,27 @@ function calculateMonthPaySummary(shifts, paySettings, monthKey) {
     });
   });
 
+  const effectiveExtraRate = paySettings.isAutoExtraRate
+    ? calculateAutoExtraRate(
+        paySettings.baseRate,
+        paySettings.jobAllowance,
+        paySettings.dailyBonus,
+        fullWorkdayDates.size,
+        paySettings.monthlyBonus,
+      )
+    : paySettings.extraRate;
+  const effectivePaySettings = {
+    ...paySettings,
+    extraRate: effectiveExtraRate,
+    attendanceAllowance: paySettings.isAutoExtraRate
+      ? paySettings.dailyBonus * fullWorkdayDates.size
+      : paySettings.manualAttendanceAllowance,
+    fullWorkdayCount: fullWorkdayDates.size,
+  };
   const totalAmount = PAY_CATEGORY_ORDER.reduce((sum, category) => {
     const categoryBaseRate = EXTRA_RATE_CATEGORIES.has(category)
-      ? paySettings.extraRate
-      : paySettings.baseRate;
+      ? effectivePaySettings.extraRate
+      : effectivePaySettings.baseRate;
     const rate = categoryBaseRate * PAY_CATEGORIES[category].multiplier;
 
     return sum + Math.round((breakdown[category] * rate) / 60);
@@ -868,17 +1274,17 @@ function calculateMonthPaySummary(shifts, paySettings, monthKey) {
   const completedWeekCount = getCompletedWeekCount(monthKey, fullWorkdayDates);
   const bonuses = {
     daily: {
-      label: "Ежедневный бонус",
+      labelKey: "bonusDaily",
       count: fullWorkdayDates.size,
       rate: paySettings.dailyBonus,
     },
     weekly: {
-      label: "Недельный бонус",
+      labelKey: "bonusWeekly",
       count: completedWeekCount,
       rate: paySettings.weeklyBonus,
     },
     monthly: {
-      label: "Месячный бонус",
+      labelKey: "bonusMonthly",
       count: isFullMonth ? 1 : 0,
       rate: paySettings.monthlyBonus,
     },
@@ -891,6 +1297,7 @@ function calculateMonthPaySummary(shifts, paySettings, monthKey) {
   return {
     breakdown,
     bonuses,
+    paySettings: effectivePaySettings,
     totalAmount: totalAmount + bonusAmount,
   };
 }
@@ -908,7 +1315,7 @@ function createSalaryBreakdownRow(category, minutes, paySettings) {
 
   const label = document.createElement("span");
   label.className = "salary-breakdown-row__label";
-  label.textContent = PAY_CATEGORIES[category].label;
+  label.textContent = t(PAY_CATEGORIES[category].labelKey);
 
   const calculation = document.createElement("small");
   calculation.className = "salary-breakdown-row__calculation";
@@ -932,7 +1339,7 @@ function createBonusBreakdownRow(bonus) {
 
   const label = document.createElement("span");
   label.className = "salary-breakdown-row__label";
-  label.textContent = bonus.label;
+  label.textContent = t(bonus.labelKey);
 
   const calculation = document.createElement("small");
   calculation.className = "salary-breakdown-row__calculation";
@@ -966,6 +1373,7 @@ function renderMonthOptions(preferredMonth) {
     selectedMonthIndex = -1;
     previousHistoryMonthButton.disabled = true;
     nextHistoryMonthButton.disabled = true;
+    updatePaySettingsInputs(monthSelect.value);
     return;
   }
 
@@ -978,6 +1386,7 @@ function renderMonthOptions(preferredMonth) {
   previousHistoryMonthButton.disabled =
     selectedMonthIndex >= availableMonths.length - 1;
   nextHistoryMonthButton.disabled = selectedMonthIndex <= 0;
+  updatePaySettingsInputs(monthSelect.value);
 }
 
 function changeHistoryMonth(direction) {
@@ -998,7 +1407,12 @@ function changeHistoryMonth(direction) {
   previousHistoryMonthButton.disabled =
     selectedMonthIndex >= availableMonthKeys.length - 1;
   nextHistoryMonthButton.disabled = selectedMonthIndex <= 0;
+  updatePaySettingsInputs(selectedMonth);
   renderShifts();
+
+  if (!salaryEstimateOverlay.hidden) {
+    renderSalaryEstimate();
+  }
 }
 
 // Перерисовывает расчёт без закрытия окна.
@@ -1006,7 +1420,7 @@ function renderSalaryEstimate() {
   const shiftsForMonth = getSavedShifts().filter(
     (shift) => getMonthKey(shift.date) === monthSelect.value,
   );
-  const paySettings = getPaySettings();
+  const paySettings = getPaySettings(monthSelect.value);
   const paySummary = calculateMonthPaySummary(
     shiftsForMonth,
     paySettings,
@@ -1021,7 +1435,7 @@ function renderSalaryEstimate() {
 
     if (minutes > 0) {
       salaryBreakdown.append(
-        createSalaryBreakdownRow(category, minutes, paySettings),
+        createSalaryBreakdownRow(category, minutes, paySummary.paySettings),
       );
     }
   });
@@ -1132,7 +1546,7 @@ function closeShiftActions(restoreFocus = true) {
 function finishEditing() {
   editingShiftId = null;
   editingOriginalDate = null;
-  saveButton.textContent = "Сохранить";
+  saveButton.textContent = t("save");
 }
 
 // Создаёт одну карточку смены без вставки HTML-строк из localStorage.
@@ -1171,8 +1585,8 @@ function createShiftDetails(shift) {
   const details = document.createElement("div");
   details.className = "shift-card__details";
 
-  const startRow = createTimeRow("Начало смены", shift.startTime);
-  const endRow = createTimeRow("Конец смены", shift.endTime);
+  const startRow = createTimeRow(t("startShift"), shift.startTime);
+  const endRow = createTimeRow(t("endShift"), shift.endTime);
   const breakRow = createBreakSummaryRow(shift);
 
   details.append(startRow, endRow);
@@ -1192,11 +1606,11 @@ function createBreakSummaryRow(shift) {
   const breakParts = [];
 
   if (lunchBreakMinutes > 0) {
-    breakParts.push(`Обед ${formatBreakDisplay(lunchBreakMinutes)}`);
+    breakParts.push(`${t("lunch")} ${formatBreakDisplay(lunchBreakMinutes)}`);
   }
 
   if (dinnerBreakMinutes > 0) {
-    breakParts.push(`Ужин ${formatBreakDisplay(dinnerBreakMinutes)}`);
+    breakParts.push(`${t("dinner")} ${formatBreakDisplay(dinnerBreakMinutes)}`);
   }
 
   if (breakParts.length === 0) {
@@ -1234,7 +1648,7 @@ function createDayOffCard(dateValue) {
   card.dataset.dayOffDate = dateValue;
   card.setAttribute(
     "aria-label",
-    `Выходной ${formatShiftDate(dateValue)} ${formatShortWeekday(dateValue)}`,
+    `${t("dayOff")} ${formatShiftDate(dateValue)} ${formatShortWeekday(dateValue)}`,
   );
 
   card.append(createDayOffDetails(dateValue));
@@ -1261,7 +1675,7 @@ function createDayOffDetails(dateValue) {
 
   const status = document.createElement("p");
   status.className = "day-off-card__status";
-  status.textContent = "Выходной";
+  status.textContent = t("dayOff");
 
   dateLine.append(date, weekday);
   wrapper.append(dateLine, status);
@@ -1414,42 +1828,54 @@ function showAuthForm(formName) {
   registerTabButton.classList.toggle("auth-tab--active", !isLogin);
   loginTabButton.setAttribute("aria-selected", String(isLogin));
   registerTabButton.setAttribute("aria-selected", String(!isLogin));
-  authPreviewMessage.textContent = isFirebaseConfigured
-    ? ""
-    : "Подключение Firebase ожидает настройки";
+  if (isFirebaseConfigured) {
+    setAuthMessage("");
+  } else {
+    setTranslatedAuthMessage("firebasePending");
+  }
 }
 
 function setAuthMessage(message, isError = false) {
   authPreviewMessage.textContent = message;
+  delete authPreviewMessage.dataset.authMessage;
   authPreviewMessage.classList.toggle("auth-preview-message--error", isError);
+}
+
+function setTranslatedAuthMessage(key, isError = false) {
+  authPreviewMessage.dataset.authMessage = key;
+  authPreviewMessage.textContent = t(key);
+  authPreviewMessage.classList.toggle("auth-preview-message--error", isError);
+}
+
+function setSyncStatus(key) {
+  accountSyncText.dataset.syncStatus = key;
+  accountSyncText.textContent = t(key);
 }
 
 function setAuthLoading(form, isLoading) {
   const submitButton = form.querySelector('button[type="submit"]');
   submitButton.disabled = isLoading;
   submitButton.textContent = isLoading
-    ? "Подождите…"
+    ? t("wait")
     : form === loginForm
-      ? "Войти"
-      : "Создать профиль";
+      ? t("login")
+      : t("createProfile");
 }
 
 function getFirebaseErrorMessage(error) {
   const messages = {
-    "auth/email-already-in-use": "Профиль с таким email уже существует",
-    "auth/invalid-credential": "Неверный email или пароль",
-    "auth/invalid-email": "Проверьте правильность email",
-    "auth/missing-password": "Введите пароль",
-    "auth/configuration-not-found":
-      "Включите Email/Password в настройках Firebase Authentication",
-    "auth/operation-not-allowed":
-      "Включите Email/Password в настройках Firebase Authentication",
-    "auth/weak-password": "Пароль должен содержать минимум 6 символов",
-    "auth/too-many-requests": "Слишком много попыток. Попробуйте позже",
-    "auth/network-request-failed": "Нет соединения с интернетом",
+    "auth/email-already-in-use": "emailAlreadyInUse",
+    "auth/invalid-credential": "invalidCredential",
+    "auth/invalid-email": "invalidEmail",
+    "auth/missing-password": "missingPassword",
+    "auth/configuration-not-found": "authNotAllowed",
+    "auth/operation-not-allowed": "authNotAllowed",
+    "auth/weak-password": "weakPassword",
+    "auth/too-many-requests": "tooManyRequests",
+    "auth/network-request-failed": "networkFailed",
   };
 
-  return messages[error.code] || "Не удалось выполнить операцию";
+  return t(messages[error.code] || "authOperationFailed");
 }
 
 function updateAccountView(user, isAuthResolved = true) {
@@ -1461,7 +1887,8 @@ function updateAccountView(user, isAuthResolved = true) {
   if (isSignedIn) {
     activeStorageUserId = user.uid;
     localStorage.setItem(LAST_USER_KEY, user.uid);
-    accountName.textContent = user.displayName || "Пользователь";
+    accountName.dataset.fallbackUser = user.displayName ? "false" : "true";
+    accountName.textContent = user.displayName || t("user");
     accountEmail.textContent = user.email || "";
     setAuthMessage("");
   } else {
@@ -1481,7 +1908,7 @@ function refreshShiftInterface(preferredMonth) {
 }
 
 async function synchronizeUserShifts(user) {
-  accountSyncText.textContent = "Синхронизация данных…";
+  setSyncStatus("syncing");
 
   let guestShifts = [];
   let localUserShifts = [];
@@ -1525,7 +1952,7 @@ async function synchronizeUserShifts(user) {
   );
 
   await uploadCloudShifts(user.uid, [...shiftsToUploadByDate.values()]);
-  accountSyncText.textContent = "Данные синхронизированы";
+  setSyncStatus("synced");
   refreshShiftInterface();
 }
 
@@ -1535,16 +1962,16 @@ async function saveShiftOnline(shift, previousDate = null) {
   }
 
   try {
-    accountSyncText.textContent = "Синхронизация данных…";
+    setSyncStatus("syncing");
 
     if (previousDate && previousDate !== shift.date) {
       await deleteCloudShift(currentUser.uid, previousDate);
     }
 
     await saveCloudShift(currentUser.uid, shift);
-    accountSyncText.textContent = "Данные синхронизированы";
+    setSyncStatus("synced");
   } catch (error) {
-    accountSyncText.textContent = "Сохранено на устройстве";
+    setSyncStatus("savedOnDevice");
     console.error("Не удалось синхронизировать смену:", error);
   }
 }
@@ -1554,7 +1981,7 @@ shiftForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
   if (!startTimeInput.value || !endTimeInput.value) {
-    showSavedMessage("Выберите начало и конец смены");
+    showSavedMessage(t("chooseShiftTime"));
     return;
   }
 
@@ -1562,7 +1989,7 @@ shiftForm.addEventListener("submit", async (event) => {
   const dinnerBreakMinutes = breakValueToMinutes(dinnerBreakInput.value);
 
   if (lunchBreakMinutes === null || dinnerBreakMinutes === null) {
-    showSavedMessage("Выберите перерыв заново");
+    showSavedMessage(t("chooseBreakAgain"));
     return;
   }
 
@@ -1573,7 +2000,7 @@ shiftForm.addEventListener("submit", async (event) => {
       endTime: endTimeInput.value,
     })
   ) {
-    showSavedMessage("Перерывы больше смены");
+    showSavedMessage(t("breaksLongerThanShift"));
     return;
   }
 
@@ -1637,6 +2064,7 @@ navigationButtons.forEach((button) => {
   button.addEventListener("click", () => showPage(button.dataset.page));
 });
 
+languageToggleButton.addEventListener("click", toggleLanguage);
 profileButton.addEventListener("click", () => showPage("profilePage"));
 closeProfileButton.addEventListener("click", () => showPage("homePage"));
 loginTabButton.addEventListener("click", () => showAuthForm("login"));
@@ -1646,7 +2074,7 @@ loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
   if (!isFirebaseConfigured) {
-    setAuthMessage("Сначала добавьте конфигурацию Firebase", true);
+    setTranslatedAuthMessage("firebaseMissing", true);
     return;
   }
 
@@ -1670,7 +2098,7 @@ registerForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
   if (!isFirebaseConfigured) {
-    setAuthMessage("Сначала добавьте конфигурацию Firebase", true);
+    setTranslatedAuthMessage("firebaseMissing", true);
     return;
   }
 
@@ -1695,18 +2123,18 @@ forgotPasswordButton.addEventListener("click", async () => {
   const email = new FormData(loginForm).get("username").trim();
 
   if (!email) {
-    setAuthMessage("Сначала введите email", true);
+    setTranslatedAuthMessage("emailFirst", true);
     return;
   }
 
   if (!isFirebaseConfigured) {
-    setAuthMessage("Сначала добавьте конфигурацию Firebase", true);
+    setTranslatedAuthMessage("firebaseMissing", true);
     return;
   }
 
   try {
     await resetAccountPassword(email);
-    setAuthMessage("Письмо для восстановления отправлено");
+    setTranslatedAuthMessage("resetEmailSent");
   } catch (error) {
     setAuthMessage(getFirebaseErrorMessage(error), true);
   }
@@ -1717,7 +2145,7 @@ logoutButton.addEventListener("click", async () => {
     await logoutAccount();
     showPage("homePage");
   } catch (error) {
-    setAuthMessage("Не удалось выйти из профиля", true);
+    setTranslatedAuthMessage("logoutFailed", true);
   }
 });
 
@@ -1732,23 +2160,54 @@ nextHistoryMonthButton.addEventListener("click", () => {
 shiftCount.addEventListener("click", openSalaryEstimate);
 paySettingsButton.addEventListener("click", openPaySettings);
 
-[
-  [baseRateInput, BASE_RATE_KEY, DEFAULT_BASE_RATE],
-  [extraRateInput, EXTRA_RATE_KEY, () => getBaseRate()],
-  [monthlyBonusInput, MONTHLY_BONUS_KEY, 0],
-  [weeklyBonusInput, WEEKLY_BONUS_KEY, 0],
-  [dailyBonusInput, DAILY_BONUS_KEY, 0],
-].forEach(([input, key, fallback]) => {
-  input.addEventListener("change", () => {
-    const fallbackValue =
-      typeof fallback === "function" ? fallback() : fallback;
+function refreshPaySettingsAfterChange() {
+  updatePaySettingsInputs();
 
-    setMoneySetting(key, input, fallbackValue);
+  if (!salaryEstimateOverlay.hidden) {
+    renderSalaryEstimate();
+  }
+}
 
-    if (!salaryEstimateOverlay.hidden) {
-      renderSalaryEstimate();
-    }
+function getSafeInputMoney(input, fallback = 0) {
+  const value = Math.max(0, Number(input.value) || 0);
+
+  return value || fallback;
+}
+
+function saveSelectedMonthPaySettings() {
+  const monthKey = monthSelect.value || getMonthKey(getTodayValue());
+  const previousSettings = loadMonthPaySettings(monthKey);
+  const baseRate = getSafeInputMoney(baseRateInput, DEFAULT_BASE_RATE);
+  const isAutoExtraRate = autoExtraRateInput.checked;
+  const manualExtraRate = isAutoExtraRate
+    ? previousSettings.manualExtraRate || baseRate
+    : getSafeInputMoney(extraRateInput, baseRate);
+
+  saveMonthPaySettings(monthKey, {
+    baseRate,
+    manualExtraRate,
+    isAutoExtraRate,
+    jobAllowance: getSafeInputMoney(jobAllowanceInput),
+    manualAttendanceAllowance: getSafeInputMoney(attendanceAllowanceInput),
+    monthlyBonus: getSafeInputMoney(monthlyBonusInput),
+    weeklyBonus: getSafeInputMoney(weeklyBonusInput),
+    dailyBonus: getSafeInputMoney(dailyBonusInput),
   });
+
+  refreshPaySettingsAfterChange();
+}
+
+[
+  baseRateInput,
+  extraRateInput,
+  autoExtraRateInput,
+  jobAllowanceInput,
+  attendanceAllowanceInput,
+  monthlyBonusInput,
+  weeklyBonusInput,
+  dailyBonusInput,
+].forEach((input) => {
+  input.addEventListener("change", saveSelectedMonthPaySettings);
 });
 
 salaryEstimateOverlay.addEventListener("click", (event) => {
@@ -1794,7 +2253,7 @@ editShiftButton.addEventListener("click", () => {
   setBreakValue("lunch", shift.lunchBreakMinutes || 0);
   setBreakValue("dinner", shift.dinnerBreakMinutes || 0);
   updateSelectedDateText();
-  saveButton.textContent = "Сохранить изменения";
+  saveButton.textContent = t("saveChanges");
 
   closeShiftActions(false);
   showPage("homePage");
@@ -1817,9 +2276,9 @@ deleteShiftButton.addEventListener("click", async () => {
   if (currentUser && deletedShift) {
     try {
       await deleteCloudShift(currentUser.uid, deletedShift.date);
-      accountSyncText.textContent = "Данные синхронизированы";
+      setSyncStatus("synced");
     } catch (error) {
-      accountSyncText.textContent = "Удалено только на устройстве";
+      setSyncStatus("deletedOnDevice");
       console.error("Не удалось удалить смену из облака:", error);
     }
   }
@@ -1931,6 +2390,7 @@ restoreLastShiftValues();
 handleSelectedDateChange();
 
 updatePaySettingsInputs();
+applyLanguage();
 
 updateAccountView(null, false);
 
@@ -1946,7 +2406,7 @@ observeAuthState(async (user) => {
   try {
     await synchronizeUserShifts(user);
   } catch (error) {
-    accountSyncText.textContent = "Не удалось загрузить облачные данные";
+    setSyncStatus("cloudLoadFailed");
     refreshShiftInterface();
     console.error("Ошибка загрузки Firestore:", error);
   }

@@ -146,6 +146,7 @@ body.profile-page-active .app-content {
 }
 
 #homePage {
+  position: relative;
   height: 100%;
   flex-direction: column;
   justify-content: center;
@@ -204,6 +205,32 @@ body.profile-page-active .app-content {
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 1.7;
+}
+
+.language-toggle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  min-width: 68px;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  border-radius: 999px;
+  color: var(--text-main);
+  font: inherit;
+  font-size: 0.78rem;
+  background: var(--app-block-background);
+  box-shadow: 0 12px 28px rgba(23, 25, 28, 0.12);
+  cursor: pointer;
+}
+
+.language-toggle:active {
+  transform: scale(0.96);
+}
+
+.language-toggle:focus-visible {
+  outline: 2px solid rgba(23, 25, 28, 0.3);
+  outline-offset: 3px;
 }
 
 .profile-page__header {
@@ -670,6 +697,67 @@ h1 {
   display: grid;
   gap: 12px;
   margin-top: 16px;
+}
+
+.pay-settings-fields .base-rate-field {
+  justify-items: center;
+  overflow: hidden;
+  max-height: 86px;
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    max-height 220ms ease,
+    opacity 180ms ease,
+    transform 220ms ease;
+}
+
+.pay-settings-fields .base-rate-field span {
+  width: 100%;
+  text-align: center;
+}
+
+.pay-settings-fields .base-rate-field input {
+  width: min(100%, 260px);
+  margin: 0 auto;
+  font-variant-numeric: tabular-nums;
+  -moz-appearance: textfield;
+}
+
+.pay-settings-fields .base-rate-field input::-webkit-outer-spin-button,
+.pay-settings-fields .base-rate-field input::-webkit-inner-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+
+.auto-rate-field {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  width: min(100%, 260px);
+  margin: -2px auto 0;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  text-align: left;
+}
+
+.auto-rate-field input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--button);
+}
+
+.pay-settings-fields .base-rate-field input:disabled {
+  color: rgba(31, 35, 40, 0.62);
+  background: rgba(255, 255, 255, 0.48);
+}
+
+.pay-settings-fields .base-rate-field--hidden {
+  max-height: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-6px);
 }
 
 .save-button {
